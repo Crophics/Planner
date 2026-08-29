@@ -5,38 +5,91 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Planner</title>
 <link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
 <style>
-body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#e8e6df;background:#14161f;}
+:root[data-theme="dark"]{
+  --pl-bg:#111111; --pl-fg:#e8e6df; --pl-card-bg:rgba(255,255,255,0.04);
+  --pl-today-bg:#30302e; --pl-today-fg:#f4f2ec; --pl-input-bg:#1f1e1c; --pl-border:#42423d;
+  --pl-muted:#9c9a92; --pl-modal-bg:#2d2d2a; --pl-bar-bg:#3a3a35; --pl-modal-shadow:rgba(0,0,0,0.5);
+  --pl-backdrop:rgba(0,0,0,0.65); --pl-overdue-bg:rgba(217,69,53,0.15);
+}
+:root[data-theme="light"]{
+  --pl-bg:#f4f2ec; --pl-fg:#20232b; --pl-card-bg:rgba(0,0,0,0.04);
+  --pl-today-bg:#e2e6f5; --pl-today-fg:#20232b; --pl-input-bg:#ffffff; --pl-border:#cfd2dc;
+  --pl-muted:#666666; --pl-modal-bg:#ffffff; --pl-bar-bg:#e2e2e2; --pl-modal-shadow:rgba(0,0,0,0.2);
+  --pl-backdrop:rgba(0,0,0,0.35); --pl-overdue-bg:rgba(217,69,53,0.1);
+}
+:root[data-theme="blue"]{
+  --pl-bg:#14161f; --pl-fg:#e8e6df; --pl-card-bg:rgba(255,255,255,0.05);
+  --pl-today-bg:#22293b; --pl-today-fg:#f4f2ec; --pl-input-bg:#1e2130; --pl-border:#3a3f52;
+  --pl-muted:#9a9a9a; --pl-modal-bg:#1e2130; --pl-bar-bg:#2a2d3d; --pl-modal-shadow:rgba(0,0,0,0.5);
+  --pl-backdrop:rgba(0,0,0,0.65); --pl-overdue-bg:rgba(217,69,53,0.15);
+}
+body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--pl-fg);background:var(--pl-bg);}
 #pl-app{max-width:640px;font-family:inherit;}
-#pl-app .pl-today{background:#22293b;color:#f4f2ec;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;}
+#pl-app .pl-today{background:var(--pl-today-bg);color:var(--pl-today-fg);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;}
 #pl-app .pl-today b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;opacity:0.7;margin-bottom:6px;}
 #pl-app .pl-today .pl-today-row{display:flex;justify-content:space-between;margin-top:4px;}
-#pl-app .pl-card{border-radius:10px;padding:14px;margin-bottom:10px;border-left:4px solid #888;background:rgba(255,255,255,0.05);}
+#pl-app .pl-summary{font-size:12.5px;color:var(--pl-muted);margin:-4px 0 12px;}
+#pl-app .pl-week{display:flex;gap:6px;margin:0 0 14px;align-items:flex-end;}
+#pl-app .pl-week-col{flex:1;display:flex;flex-direction:column;align-items:center;font-size:10px;color:var(--pl-muted);}
+#pl-app .pl-week-bar{width:100%;background:var(--pl-bar-bg);border-radius:4px 4px 0 0;display:flex;align-items:flex-start;justify-content:center;color:#fff;font-size:10px;min-height:4px;}
+#pl-app .pl-week-bar-stack{width:100%;display:flex;flex-direction:column-reverse;border-radius:4px 4px 0 0;overflow:hidden;}
+#pl-app .pl-week-seg{width:100%;}
+#pl-app .pl-week-label{margin-top:4px;}
+#pl-app .pl-bulkbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--pl-today-bg);color:var(--pl-today-fg);padding:8px 12px;border-radius:8px;margin-bottom:10px;font-size:13px;}
+#pl-app .pl-bulkbar button{margin:0;}
+#pl-app .pl-card{border-radius:10px;padding:14px;margin-bottom:10px;border-left:4px solid #888;background:var(--pl-card-bg);}
 #pl-app .pl-card.pl-done{opacity:0.5;}
 #pl-app .pl-card.pl-locked{opacity:0.6;border-left-color:#999;}
 #pl-app .pl-card.pl-urgent{border-left-color:#c96a48;}
 #pl-app .pl-card.pl-soon{border-left-color:#d1a24f;}
 #pl-app .pl-card.pl-ok{border-left-color:#4f8b74;}
-#pl-app input,#pl-app select,#pl-app textarea{width:100%;box-sizing:border-box;padding:6px;margin-bottom:8px;border-radius:6px;border:1px solid #3a3f52;background:#1e2130;color:#e8e6df;font-family:inherit;}
+#pl-app .pl-card.pl-overdue{border-left-color:#d94535;background:var(--pl-overdue-bg);}
+#pl-app .pl-overdue-text{color:#e2604e;font-weight:600;}
+#pl-app .pl-empty{text-align:center;padding:34px 10px;color:var(--pl-muted);font-size:14px;}
+#pl-app .pl-card-head{display:flex;align-items:flex-start;gap:8px;}
+#pl-app .pl-card-head input[type="checkbox"]{width:auto;margin:3px 0 0;}
+#pl-app input,#pl-app select,#pl-app textarea{width:100%;box-sizing:border-box;padding:6px;margin-bottom:8px;border-radius:6px;border:1px solid var(--pl-border);background:var(--pl-input-bg);color:var(--pl-fg);font-family:inherit;}
 #pl-app textarea{resize:vertical;min-height:50px;}
 #pl-app button{padding:6px 12px;border-radius:6px;border:none;background:#4f8b74;color:#fff;cursor:pointer;font-size:13px;margin-right:4px;margin-top:4px;}
 #pl-app button.pl-secondary{background:#5a5f72;}
 #pl-app button.pl-complete{background:#4f8b74;}
 #pl-app button.pl-danger{background:#c96a48;}
-#pl-app .pl-bar{background:#2a2d3d;border-radius:4px;height:8px;overflow:hidden;margin:8px 0;}
+#pl-app .pl-bar{background:var(--pl-bar-bg);border-radius:4px;height:8px;overflow:hidden;margin:8px 0;}
 #pl-app .pl-fill{background:#4f8b74;height:100%;}
 #pl-app .pl-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-top:6px;}
 #pl-app .pl-tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;color:#fff;margin-bottom:4px;}
 #pl-app .pl-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0;font-size:13px;}
 #pl-app .pl-controls select,#pl-app .pl-controls input{width:auto;margin-bottom:0;}
-#pl-app .pl-io{display:flex;gap:8px;margin-bottom:14px;}
+#pl-app .pl-io{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
 #pl-app .pl-io button{background:#5a5f72;}
-#pl-app .pl-waiting{font-style:italic;color:#999;}
-#pl-app .pl-notes{font-size:12.5px;color:#9a9a9a;margin-top:4px;white-space:pre-wrap;}
-#pl-modal-backdrop{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;box-sizing:border-box;}
-#pl-modal-box{background:#1e2130;color:#e8e6df;border-radius:12px;padding:20px;max-width:420px;width:100%;max-height:90vh;overflow-y:auto;position:relative;box-shadow:0 10px 40px rgba(0,0,0,0.5);}
-#pl-modal-close{position:absolute;top:10px;right:14px;background:none;border:none;font-size:24px;line-height:1;color:#9a9a9a;cursor:pointer;padding:0;margin:0;}
-#pl-modal-close:hover{color:#e8e6df;}
+#pl-app .pl-waiting{font-style:italic;color:var(--pl-muted);}
+#pl-app .pl-notes{font-size:12.5px;color:var(--pl-muted);margin-top:4px;white-space:pre-wrap;}
+#pl-app .pl-subtasks{margin-top:8px;font-size:12.5px;}
+#pl-app .pl-subtask-row{display:flex;align-items:center;gap:6px;margin-top:3px;}
+#pl-app .pl-subtask-row input{width:auto;margin:0;}
+#pl-app .pl-recurring-tag{font-size:11px;color:var(--pl-muted);margin-left:6px;}
+#pl-app .pl-bottom-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:13px;color:var(--pl-muted);}
+#pl-app .pl-bottom-row select{width:auto;display:inline-block;margin-bottom:0;}
+#pl-app .pl-course-manager{margin-top:10px;padding:10px;border-radius:8px;background:var(--pl-card-bg);}
+#pl-app .pl-course-row{display:flex;gap:8px;align-items:center;margin-bottom:6px;}
+#pl-app .pl-course-row input[type="text"]{flex:1;margin-bottom:0;}
+#pl-app .pl-course-row input[type="color"]{width:40px;padding:0;height:32px;margin-bottom:0;}
+#pl-modal-backdrop{position:fixed;top:0;left:0;right:0;bottom:0;background:var(--pl-backdrop);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;box-sizing:border-box;}
+#pl-modal-box{background:var(--pl-modal-bg);color:var(--pl-fg);border-radius:12px;padding:20px;max-width:420px;width:100%;max-height:90vh;overflow-y:auto;position:relative;box-shadow:0 10px 40px var(--pl-modal-shadow);}
+#pl-modal-close{position:absolute;top:10px;right:14px;background:none;border:none;font-size:24px;line-height:1;color:var(--pl-muted);cursor:pointer;padding:0;margin:0;}
+#pl-modal-close:hover{color:var(--pl-fg);}
+@media (max-width: 600px){
+  #pl-modal-backdrop{align-items:flex-end;padding:0;}
+  #pl-modal-box{max-width:100%;width:100%;border-radius:16px 16px 0 0;max-height:85vh;animation:pl-sheet-up 0.25s ease-out;}
+}
+@keyframes pl-sheet-up{
+  from{ transform:translateY(100%); }
+  to{ transform:translateY(0); }
+}
+#pl-toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#2d2d2a;color:#fff;padding:10px 16px;border-radius:8px;display:none;align-items:center;gap:12px;font-size:13px;z-index:2000;box-shadow:0 6px 20px rgba(0,0,0,0.4);}
+#pl-toast button{background:#4f8b74;margin:0;padding:4px 10px;border:none;border-radius:6px;color:#fff;cursor:pointer;font-size:13px;}
 </style>
 </head>
 <body>
@@ -49,26 +102,137 @@ navigator.serviceWorker.register('sw.js');
 <script>
 (function(){
   const KEY='pl-assignments';
+  const PREFS_KEY='pl-prefs';
+  const COURSE_COLORS_KEY='pl-course-colors';
+  const COMPLETION_LOG_KEY='pl-completion-log';
+  const ARCHIVE_AFTER_DAYS=14;
+
   let items = JSON.parse(localStorage.getItem(KEY) || '[]');
   let editIndex = null;
   let showForm = false;
-  let sortMode = 'urgency';
-  let hideDone = false;
-  let courseFilter = '';
+  let showCourseManager = false;
+  let selected = new Set();
+  // Tracks which element should regain focus after the next render.
+  // Either the string 'title' (focus the form's title field) or
+  // {id, selStart, selEnd} to restore focus + cursor position on a specific input.
+  let pendingFocus = null;
+  let pendingScrollId = null;
+  let pendingAnchorId = null;
+
+  let prefs = {};
+  try{ prefs = JSON.parse(localStorage.getItem(PREFS_KEY)) || {}; }catch(e){ prefs = {}; }
+  let sortMode = prefs.sortMode || 'urgency';
+  let hideDone = !!prefs.hideDone;
+  let showArchived = !!prefs.showArchived;
+  let searchTerm = prefs.searchTerm || '';
+  let theme = ['dark','light','blue','auto'].includes(prefs.theme) ? prefs.theme : 'blue';
+
+  let courseColors = {};
+  try{ courseColors = JSON.parse(localStorage.getItem(COURSE_COLORS_KEY)) || {}; }catch(e){ courseColors = {}; }
+  function saveCourseColors(){ localStorage.setItem(COURSE_COLORS_KEY, JSON.stringify(courseColors)); }
+
+  let completionLog = [];
+  try{ completionLog = JSON.parse(localStorage.getItem(COMPLETION_LOG_KEY)) || []; }catch(e){ completionLog = []; }
+  function saveCompletionLog(){ localStorage.setItem(COMPLETION_LOG_KEY, JSON.stringify(completionLog)); }
+
+  function savePrefs(){
+    localStorage.setItem(PREFS_KEY, JSON.stringify({sortMode,hideDone,showArchived,searchTerm,theme}));
+  }
+
+  function applyTheme(){
+    let eff = theme;
+    if(theme==='auto'){
+      eff = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    }
+    document.documentElement.setAttribute('data-theme', eff);
+  }
+  applyTheme();
+  if(window.matchMedia){
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', ()=>{
+      if(theme==='auto') applyTheme();
+    });
+  }
+
   const root = document.getElementById('pl-app');
 
-  const colors = ['#3c6e5c','#b4842a','#af4e2c','#4a5a8c','#7a4a8c'];
+  document.addEventListener('keydown', (e)=>{
+    if(e.key === 'Escape' && (editIndex!==null || showForm)){
+      editIndex = null; showForm = false; render();
+      return;
+    }
+    const tag = document.activeElement ? document.activeElement.tagName : '';
+    const typing = tag==='INPUT' || tag==='TEXTAREA' || tag==='SELECT';
+    if(!typing && editIndex===null && !showForm){
+      if(e.key==='n'){
+        e.preventDefault(); showForm = true; pendingFocus = 'title'; render();
+      } else if(e.key==='/'){
+        e.preventDefault();
+        const f = document.getElementById('pl-filter');
+        if(f) f.focus();
+      }
+    }
+  });
+
+  const defaultColors = ['#1fae8e','#f0a824','#e8553c','#4361ee','#b83fd1','#2ea9dd','#e0538a'];
+  let currentColorMap = {};
+  function computeCourseColorMap(){
+    const courseKeys = [...new Set(items.map(i=>(i.course||'').trim().toLowerCase()).filter(Boolean))].sort();
+    const map = {};
+    const usedColors = new Set();
+    // Manual overrides get priority and reserve their color.
+    courseKeys.forEach(key=>{
+      if(courseColors[key]){
+        map[key] = courseColors[key];
+        usedColors.add(courseColors[key]);
+      }
+    });
+    // Everyone else gets the first unused color from the palette.
+    // Only once every color is taken do we fall back to hash-based reuse.
+    courseKeys.forEach(key=>{
+      if(map[key]) return;
+      let assigned = defaultColors.find(c=>!usedColors.has(c));
+      if(!assigned){
+        let h=0; for(let c of key) h = (h*31 + c.charCodeAt(0))>>>0;
+        assigned = defaultColors[h % defaultColors.length];
+      }
+      map[key] = assigned;
+      usedColors.add(assigned);
+    });
+    return map;
+  }
   function courseColor(course){
-    if(!course) return '#888';
-    let h=0; for(let c of course) h = (h*31 + c.charCodeAt(0))>>>0;
-    return colors[h % colors.length];
+    const key = (course||'').trim().toLowerCase();
+    if(!key) return '#888';
+    return currentColorMap[key] || '#888';
+  }
+
+  function renameCourse(oldName, newName){
+    const oldKey = oldName.trim().toLowerCase();
+    const newKey = newName.trim().toLowerCase();
+    items.forEach(it=>{
+      if((it.course||'').trim().toLowerCase()===oldKey) it.course = newName.trim();
+    });
+    if(oldKey!==newKey && courseColors[oldKey]){
+      courseColors[newKey] = courseColors[oldKey];
+      delete courseColors[oldKey];
+      saveCourseColors();
+    }
+    save();
   }
 
   function save(){ localStorage.setItem(KEY, JSON.stringify(items)); render(); }
   function today(){ const d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
   function daysBetween(a,b){ return Math.round((new Date(b)-new Date(a))/86400000); }
+  function addDays(dateStr, n){ const d=new Date(dateStr+'T00:00:00'); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+  function addMonths(dateStr, n){ const d=new Date(dateStr+'T00:00:00'); d.setMonth(d.getMonth()+n); return d.toISOString().slice(0,10); }
+  function nextDueDate(due, recurring){
+    if(recurring==='weekly') return addDays(due,7);
+    if(recurring==='monthly') return addMonths(due,1);
+    return due;
+  }
   function urgencyClass(daysLeft, completed){
     if(completed) return '';
+    if(daysLeft<0) return 'pl-overdue';
     if(daysLeft<=2) return 'pl-urgent';
     if(daysLeft<=5) return 'pl-soon';
     return 'pl-ok';
@@ -81,6 +245,145 @@ navigator.serviceWorker.register('sw.js');
     return prereq ? !prereq.completed : false;
   }
 
+  function logCompletionToday(){
+    const t = today();
+    if(!completionLog.includes(t)){ completionLog.push(t); saveCompletionLog(); }
+  }
+  function currentStreak(){
+    let streak=0, d=today();
+    while(completionLog.includes(d)){ streak++; d=addDays(d,-1); }
+    return streak;
+  }
+  function completedThisWeek(){
+    const cutoff = addDays(today(),-6);
+    return items.filter(i=>i.completed && i.completedAt && i.completedAt>=cutoff).length;
+  }
+
+  function autoArchive(){
+    let changed=false;
+    items.forEach(it=>{
+      if(it.completed && it.completedAt && !it.archived && daysBetween(it.completedAt, today())>=ARCHIVE_AFTER_DAYS){
+        it.archived = true; changed=true;
+      }
+    });
+    if(changed) localStorage.setItem(KEY, JSON.stringify(items));
+  }
+  autoArchive();
+
+  const NOTIFY_LOG_KEY = 'pl-notify-log';
+  function getNotifyLog(){
+    try{ return JSON.parse(localStorage.getItem(NOTIFY_LOG_KEY)) || []; }catch(e){ return []; }
+  }
+  function saveNotifyLog(log){ localStorage.setItem(NOTIFY_LOG_KEY, JSON.stringify(log)); }
+
+  function checkAndNotify(){
+    if(!('Notification' in window)) return;
+    if(Notification.permission !== 'granted') return;
+    const log = getNotifyLog();
+    const t = today();
+    const tmrw = addDays(t,1);
+    const dueSoon = items.filter(it=>!it.completed && !it.archived && !isLocked(it) && (it.due===t || it.due===tmrw));
+    dueSoon.forEach(it=>{
+      const key = t+'|'+it.title;
+      if(!log.includes(key)){
+        const when = it.due===t ? 'today' : 'tomorrow';
+        new Notification('Due '+when+': '+it.title, {
+          body: (it.course? it.course+' \u2014 ':'') + 'Due '+it.due,
+          icon: 'icons/icon-192.png'
+        });
+        log.push(key);
+      }
+    });
+    const cutoff = addDays(t,-3);
+    saveNotifyLog(log.filter(k => k.split('|')[0] >= cutoff));
+  }
+  checkAndNotify();
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState==='visible') checkAndNotify();
+  });
+
+  function makeRecurringClone(it){
+    return {
+      title: it.title, course: it.course, due: nextDueDate(it.due, it.recurring),
+      total: it.total, unit: it.unit, notes: it.notes, done: 0, completed: false,
+      dependsOn: '', recurring: it.recurring,
+      subtasks: (it.subtasks||[]).map(s=>({text:s.text, done:false})),
+      completedAt: null, archived: false
+    };
+  }
+
+  let toastTimeout = null;
+  function showToast(message, onUndo){
+    let toast = document.getElementById('pl-toast');
+    if(!toast){
+      toast = document.createElement('div');
+      toast.id = 'pl-toast';
+      document.body.appendChild(toast);
+    }
+    toast.innerHTML = `<span>${message}</span><button id="pl-toast-undo">Undo</button>`;
+    toast.style.display = 'flex';
+    document.getElementById('pl-toast-undo').onclick = ()=>{
+      if(onUndo) onUndo();
+      hideToast();
+    };
+    clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(hideToast, 6000);
+  }
+  function hideToast(){
+    const toast = document.getElementById('pl-toast');
+    if(toast) toast.style.display = 'none';
+  }
+
+  function deleteItemAt(idx){
+    const removed = items[idx];
+    items.splice(idx,1);
+    selected.delete(idx);
+    save();
+    showToast(`Deleted "${removed.title}"`, ()=>{
+      items.splice(idx,0,removed);
+      save();
+    });
+  }
+
+  function clearCompleted(){
+    const idxs = items.map((it,idx)=> it.completed ? idx : -1).filter(idx=>idx>=0);
+    if(idxs.length===0) return;
+    const removed = idxs.map(i=>({item:items[i], index:i}));
+    [...idxs].reverse().forEach(i=> items.splice(i,1));
+    selected.clear();
+    save();
+    showToast(`Deleted ${removed.length} completed assignment${removed.length>1?'s':''}`, ()=>{
+      removed.forEach(r=> items.splice(r.index,0,r.item));
+      save();
+    });
+  }
+
+  function bulkDelete(){
+    const idxs = [...selected].map(Number).sort((a,b)=>b-a);
+    if(idxs.length===0) return;
+    const removed = idxs.map(i=>({item:items[i], index:i})).reverse();
+    idxs.forEach(i=> items.splice(i,1));
+    selected.clear();
+    save();
+    showToast(`Deleted ${removed.length} assignment${removed.length>1?'s':''}`, ()=>{
+      removed.forEach(r=> items.splice(r.index,0,r.item));
+      save();
+    });
+  }
+
+  function bulkComplete(){
+    selected.forEach(i=>{
+      const it = items[i];
+      if(it && !it.completed){
+        it.completed = true; it.done = it.total; it.completedAt = today();
+        logCompletionToday();
+        if(it.recurring) items.push(makeRecurringClone(it));
+      }
+    });
+    selected.clear();
+    save();
+  }
+
   function dependsOptionsHtml(course, selected, excludeItem){
     const matches = items.filter(it => it!==excludeItem && (it.course||'').trim().toLowerCase() === (course||'').trim().toLowerCase() && course);
     return `<option value="">No prerequisite</option>` +
@@ -88,21 +391,27 @@ navigator.serviceWorker.register('sw.js');
   }
 
   function formHtml(existing){
-    const e = existing || {title:'',due:'',total:'',course:'',unit:'units',dependsOn:'',notes:''};
+    const e = existing || {title:'',due:'',total:'',course:'',unit:'',dependsOn:'',notes:'',recurring:'',subtasks:[]};
     return `<h3>${existing? 'Edit Assignment' : 'Add Assignment'}</h3>
       <input id="pl-title" placeholder="Title" value="${e.title}">
       <input id="pl-course" placeholder="Course (e.g. NT)" value="${e.course||''}">
       <input id="pl-due" type="date" value="${e.due}">
       <input id="pl-units" type="number" placeholder="Total amount" value="${e.total}">
-      <input id="pl-unitlabel" placeholder="Unit (pages, hours, problems...)" value="${e.unit||''}">
+      <input id="pl-unitlabel" placeholder="Unit (pages, chapters, problems...)" value="${e.unit||''}">
       <textarea id="pl-notes" placeholder="Notes (optional)">${e.notes||''}</textarea>
+      <textarea id="pl-subtasks" placeholder="Subtasks, one per line (optional)">${(e.subtasks||[]).map(s=>s.text).join('\n')}</textarea>
+      <label style="font-size:12px;color:#888;">Repeat:</label>
+      <select id="pl-recurring">
+        <option value="" ${!e.recurring?'selected':''}>Does not repeat</option>
+        <option value="weekly" ${e.recurring==='weekly'?'selected':''}>Weekly</option>
+        <option value="monthly" ${e.recurring==='monthly'?'selected':''}>Monthly</option>
+      </select>
       <label style="font-size:12px;color:#888;">Do this after (same course only):</label>
       <select id="pl-depends">
         ${dependsOptionsHtml(e.course, e.dependsOn, existing)}
       </select>
       <button id="pl-save">${existing? 'Save Changes' : 'Add'}</button>
-      ${existing? '<button id="pl-cancel" class="pl-secondary">Cancel</button>' : ''}
-      <hr>`;
+      ${existing? '<button id="pl-cancel" class="pl-secondary">Cancel</button>' : ''}`;
   }
 
   function exportData(){
@@ -110,6 +419,28 @@ navigator.serviceWorker.register('sw.js');
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = 'planner-backup.json'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function icsEscape(s){ return (s||'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\n/g,'\\n'); }
+  function exportIcs(){
+    const lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Planner//EN'];
+    items.filter(it=>!it.archived).forEach((it,idx)=>{
+      const dt = (it.due||'').replace(/-/g,'');
+      if(!dt) return;
+      lines.push('BEGIN:VEVENT');
+      lines.push(`UID:planner-${idx}-${Date.now()}@local`);
+      lines.push(`DTSTAMP:${new Date().toISOString().replace(/[-:]/g,'').split('.')[0]}Z`);
+      lines.push(`DTSTART;VALUE=DATE:${dt}`);
+      lines.push(`SUMMARY:${icsEscape(it.title + (it.course? ' ['+it.course+']':''))}`);
+      if(it.notes) lines.push(`DESCRIPTION:${icsEscape(it.notes)}`);
+      lines.push('END:VEVENT');
+    });
+    lines.push('END:VCALENDAR');
+    const blob = new Blob([lines.join('\r\n')], {type:'text/calendar'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'planner.ics'; a.click();
     URL.revokeObjectURL(url);
   }
 
@@ -125,7 +456,47 @@ navigator.serviceWorker.register('sw.js');
     reader.readAsText(file);
   }
 
+  function weekChartHtml(){
+    const days = [];
+    for(let i=0;i<7;i++){
+      const d = addDays(today(), i);
+      const dayItems = items.filter(it=>!it.completed && !it.archived && it.due===d);
+      const byCourse = {};
+      dayItems.forEach(it=>{
+        const key = (it.course||'').trim() || 'Other';
+        byCourse[key] = (byCourse[key]||0)+1;
+      });
+      days.push({d, total: dayItems.length, byCourse});
+    }
+    const max = Math.max(1, ...days.map(x=>x.total));
+    return `<div class="pl-week">` + days.map(x=>{
+      const label = new Date(x.d+'T00:00:00').toLocaleDateString(undefined,{weekday:'short'});
+      const totalH = Math.round((x.total/max)*36)+4;
+      const courseEntries = Object.entries(x.byCourse);
+      let barHtml;
+      if(courseEntries.length===0){
+        barHtml = `<div class="pl-week-bar" style="height:${totalH}px;"></div>`;
+      } else {
+        barHtml = `<div class="pl-week-bar-stack" style="height:${totalH}px;">` +
+          courseEntries.map(([course,count])=>{
+            const segH = Math.max(4, Math.round((count/x.total)*totalH));
+            return `<div class="pl-week-seg" style="background:${courseColor(course)};height:${segH}px;" title="${course}: ${count}"></div>`;
+          }).join('') +
+        `</div>`;
+      }
+      return `<div class="pl-week-col">${barHtml}<div class="pl-week-label">${label}</div></div>`;
+    }).join('') + `</div>`;
+  }
+
   function render(){
+    currentColorMap = computeCourseColorMap();
+
+    let anchorBefore = null;
+    if(pendingAnchorId){
+      const anchorEl = document.getElementById(pendingAnchorId);
+      if(anchorEl) anchorBefore = anchorEl.getBoundingClientRect().top;
+    }
+
     let html = '';
 
     html += `<button id="pl-add-toggle" style="margin-bottom:14px;">+ Add Assignment</button>`;
@@ -136,19 +507,52 @@ navigator.serviceWorker.register('sw.js');
         <option value="due" ${sortMode==='due'?'selected':''}>Due date</option>
       </select></label>
       <label><input type="checkbox" id="pl-hide" style="width:auto;" ${hideDone?'checked':''}> Hide completed</label>
-      <input id="pl-filter" placeholder="Filter by course..." value="${courseFilter}">
+      <label><input type="checkbox" id="pl-show-archived" style="width:auto;" ${showArchived?'checked':''}> Show archived</label>
+      <input id="pl-filter" placeholder="Search title, course, notes..." value="${searchTerm}">
     </div>`;
 
+    const totalActive = items.filter(i=>!i.completed).length;
+    const totalCompleted = items.filter(i=>i.completed).length;
+    const thisWeek = completedThisWeek();
+    const streak = currentStreak();
+    html += `<div class="pl-summary">${totalActive} active \u00b7 ${totalCompleted} completed \u00b7 ${thisWeek} this week${streak>0? ' \u00b7 '+streak+'-day streak':''}</div>`;
+
+    html += weekChartHtml();
+
+    if(selected.size>0){
+      html += `<div class="pl-bulkbar">
+        <span>${selected.size} selected</span>
+        <button id="pl-bulk-complete">Complete</button>
+        <button id="pl-bulk-delete" class="pl-danger">Delete</button>
+        <button id="pl-bulk-clear" class="pl-secondary">Clear Selection</button>
+      </div>`;
+    }
+
     let list = items.map((it,i)=>({it,i}));
+    if(!showArchived) list = list.filter(x=>!x.it.archived);
     if(hideDone) list = list.filter(x=>!x.it.completed);
-    if(courseFilter) list = list.filter(x=>(x.it.course||'').toLowerCase().includes(courseFilter.toLowerCase()));
-    if(sortMode==='due') list.sort((a,b)=>a.it.due.localeCompare(b.it.due));
+    if(searchTerm){
+      const q = searchTerm.toLowerCase();
+      list = list.filter(x=>
+        (x.it.title||'').toLowerCase().includes(q) ||
+        (x.it.course||'').toLowerCase().includes(q) ||
+        (x.it.notes||'').toLowerCase().includes(q)
+      );
+    }
+    function sortPriority(it){ return isLocked(it) ? 2 : (it.completed ? 1 : 0); }
+
+    if(sortMode==='due') list.sort((a,b)=>{
+      const pa=sortPriority(a.it), pb=sortPriority(b.it);
+      if(pa!==pb) return pa-pb;
+      return a.it.due.localeCompare(b.it.due);
+    });
     else list.sort((a,b)=>{
-      if(!!a.it.completed !== !!b.it.completed) return a.it.completed?1:-1;
+      const pa=sortPriority(a.it), pb=sortPriority(b.it);
+      if(pa!==pb) return pa-pb;
       return daysBetween(today(),a.it.due) - daysBetween(today(),b.it.due);
     });
 
-    const active = items.filter(x=>!x.completed && !isLocked(x));
+    const active = items.filter(x=>!x.completed && !x.archived && !isLocked(x));
     const multi = active.filter(it=>it.total>1);
     const singles = active.filter(it=>it.total<=1 && it.done<it.total).sort((a,b)=>a.due.localeCompare(b.due));
 
@@ -167,22 +571,37 @@ navigator.serviceWorker.register('sw.js');
         : '<div class="pl-today-row"><span>Nothing due today \u2014 you\'re caught up.</span></div>') +
       `</div>` + html;
 
+    if(list.length===0){
+      html += `<div class="pl-empty">${items.length===0
+        ? "No assignments yet. Click \u201c+ Add Assignment\u201d to get started."
+        : "Nothing matches your current filters."}</div>`;
+    }
+
     list.forEach(({it,i})=>{
       const locked = isLocked(it);
       const left = Math.max(it.total-it.done,0);
       const daysLeft = daysBetween(today(), it.due);
+      const overdue = !it.completed && !locked && daysLeft<0;
       const effDays = Math.max(daysLeft,1);
-      const target = (left>0 && !it.completed) ? Math.ceil(left/effDays) : 0;
+      const target = (left>0 && !it.completed && !overdue) ? Math.ceil(left/effDays) : 0;
       const pct = Math.min(100, Math.round((it.done/it.total)*100));
       const unit = it.unit || 'units';
       const cls = locked ? 'pl-locked' : urgencyClass(daysLeft, it.completed);
       const statusText = it.completed ? 'Completed'
         : locked ? `<span class="pl-waiting">Waiting on: ${it.dependsOn}</span>`
+        : overdue ? `<span class="pl-overdue-text">Overdue by ${Math.abs(daysLeft)}d</span>`
         : (left>0? target+' '+unit+'/day':'Done');
       html += `<div class="pl-card ${it.completed?'pl-done':''} ${cls}">
-        ${it.course? `<span class="pl-tag" style="background:${courseColor(it.course)}">${it.course}</span>` : ''}
-        <div><b>${it.title}</b></div>
-        ${it.notes? `<div class="pl-notes">${it.notes}</div>` : ''}
+        <div class="pl-card-head">
+          <input type="checkbox" class="pl-select" id="pl-select-${i}" data-i="${i}" ${selected.has(i)?'checked':''}>
+          <div style="flex:1;">
+            ${it.course? `<span class="pl-tag" style="background:${courseColor(it.course)}">${it.course}</span>` : ''}
+            ${it.archived? `<span class="pl-tag" style="background:#555;">Archived</span>` : ''}
+            <div><b>${it.title}</b>${it.recurring? `<span class="pl-recurring-tag">\u21bb ${it.recurring}</span>` : ''}</div>
+            ${it.notes? `<div class="pl-notes">${it.notes}</div>` : ''}
+            ${it.subtasks && it.subtasks.length? `<div class="pl-subtasks">${it.subtasks.map((s,si)=>`<label class="pl-subtask-row"><input type="checkbox" class="pl-subtask-toggle" data-i="${i}" data-si="${si}" ${s.done?'checked':''}><span style="${s.done?'text-decoration:line-through;opacity:0.6;':''}">${s.text}</span></label>`).join('')}</div>` : ''}
+          </div>
+        </div>
         <div class="pl-row"><span>Due ${it.due}</span><span>${statusText}</span></div>
         <div class="pl-bar"><div class="pl-fill" style="width:${pct}%"></div></div>
         <div class="pl-row">
@@ -203,7 +622,42 @@ navigator.serviceWorker.register('sw.js');
         <button id="pl-import-btn" class="pl-secondary">Import Backup</button>
         <input type="file" id="pl-import" accept="application/json" style="display:none;">
       </label>
+      <button id="pl-export-ics" class="pl-secondary">Export Calendar (.ics)</button>
+      <button id="pl-clear-completed" class="pl-danger">Clear Completed</button>
     </div>`;
+
+    html += `<div class="pl-bottom-row">
+      <label>Theme: <select id="pl-theme-select">
+        <option value="dark" ${theme==='dark'?'selected':''}>Dark</option>
+        <option value="light" ${theme==='light'?'selected':''}>Light</option>
+        <option value="blue" ${theme==='blue'?'selected':''}>Blue (classic)</option>
+        <option value="auto" ${theme==='auto'?'selected':''}>Auto (system)</option>
+      </select></label>
+      <button id="pl-manage-courses" type="button" class="pl-secondary">Manage Courses</button>
+      ${('Notification' in window) ? (
+        Notification.permission==='granted'
+          ? `<span style="font-size:12px;">Reminders: On</span>`
+          : Notification.permission==='denied'
+            ? `<span style="font-size:12px;">Reminders blocked in browser settings</span>`
+            : `<button id="pl-enable-notify" class="pl-secondary">Enable Reminders</button>`
+      ) : ''}
+    </div>`;
+
+    if(showCourseManager){
+      const courseNames = [...new Set(items.map(i=>(i.course||'').trim()).filter(Boolean))];
+      html += `<div class="pl-course-manager" id="pl-course-manager">`;
+      if(courseNames.length===0){
+        html += `<div style="font-size:12.5px;color:var(--pl-muted);">No courses yet.</div>`;
+      } else {
+        courseNames.forEach(c=>{
+          html += `<div class="pl-course-row">
+            <input type="text" class="pl-course-rename" data-course="${c}" value="${c}">
+            <input type="color" class="pl-course-color" data-course="${c}" value="${courseColor(c)}">
+          </div>`;
+        });
+      }
+      html += `</div>`;
+    }
 
     if(editIndex!==null || showForm){
       html += `<div id="pl-modal-backdrop">
@@ -217,7 +671,7 @@ navigator.serviceWorker.register('sw.js');
     root.innerHTML = html;
 
     const addToggle = document.getElementById('pl-add-toggle');
-    if(addToggle) addToggle.onclick = ()=>{ showForm = true; render(); };
+    if(addToggle) addToggle.onclick = ()=>{ showForm = true; pendingFocus = 'title'; render(); };
 
     const modalBackdrop = document.getElementById('pl-modal-backdrop');
     if(modalBackdrop){
@@ -229,6 +683,7 @@ navigator.serviceWorker.register('sw.js');
     if(modalClose) modalClose.onclick = ()=>{ editIndex=null; showForm=false; render(); };
 
     document.getElementById('pl-export').onclick = exportData;
+    document.getElementById('pl-export-ics').onclick = exportIcs;
     document.getElementById('pl-import-btn').onclick = ()=> document.getElementById('pl-import').click();
     document.getElementById('pl-import').onchange = (e)=>{
       if(e.target.files[0]) importData(e.target.files[0]);
@@ -253,14 +708,22 @@ navigator.serviceWorker.register('sw.js');
         const unit = document.getElementById('pl-unitlabel').value.trim() || 'units';
         const notes = document.getElementById('pl-notes').value.trim();
         const dependsOn = document.getElementById('pl-depends').value;
+        const recurring = document.getElementById('pl-recurring').value;
+        const subtaskLines = document.getElementById('pl-subtasks').value.split('\n').map(s=>s.trim()).filter(Boolean);
         if(!title||!due||!total) return alert('Fill in title, due date, and total amount');
+        const prevSubtasks = (editIndex!==null && items[editIndex].subtasks) || [];
+        const subtasks = subtaskLines.map(text=>{
+          const prev = prevSubtasks.find(s=>s.text===text);
+          return { text, done: prev ? prev.done : false };
+        });
         if(editIndex!==null){
           const it = items[editIndex];
-          it.title=title; it.course=course; it.due=due; it.total=total; it.unit=unit; it.notes=notes; it.dependsOn=dependsOn;
+          it.title=title; it.course=course; it.due=due; it.total=total; it.unit=unit; it.notes=notes;
+          it.dependsOn=dependsOn; it.recurring=recurring; it.subtasks=subtasks;
           it.done = Math.min(it.done, total);
           editIndex = null;
         } else {
-          items.push({title,course,due,total,unit,notes,done:0,completed:false,dependsOn});
+          items.push({title,course,due,total,unit,notes,done:0,completed:false,dependsOn,recurring,subtasks,completedAt:null,archived:false});
         }
         showForm = false;
         save();
@@ -269,27 +732,126 @@ navigator.serviceWorker.register('sw.js');
     const cancelBtn = document.getElementById('pl-cancel');
     if(cancelBtn) cancelBtn.onclick = ()=>{ editIndex=null; showForm=false; render(); };
 
-    document.getElementById('pl-sort').onchange = (e)=>{ sortMode=e.target.value; render(); };
-    document.getElementById('pl-hide').onchange = (e)=>{ hideDone=e.target.checked; render(); };
-    document.getElementById('pl-filter').oninput = (e)=>{ courseFilter=e.target.value; render(); };
+    document.getElementById('pl-sort').onchange = (e)=>{ sortMode=e.target.value; savePrefs(); render(); };
+    document.getElementById('pl-hide').onchange = (e)=>{ hideDone=e.target.checked; savePrefs(); render(); };
+    document.getElementById('pl-show-archived').onchange = (e)=>{ showArchived=e.target.checked; savePrefs(); render(); };
+    document.getElementById('pl-filter').oninput = (e)=>{
+      pendingFocus = {id:'pl-filter', selStart:e.target.selectionStart, selEnd:e.target.selectionEnd};
+      searchTerm=e.target.value; savePrefs(); render();
+    };
+    document.getElementById('pl-theme-select').onchange = (e)=>{
+      theme = e.target.value;
+      applyTheme();
+      savePrefs();
+      render();
+    };
+    document.getElementById('pl-clear-completed').onclick = clearCompleted;
+
+    const manageBtn = document.getElementById('pl-manage-courses');
+    if(manageBtn) manageBtn.onclick = ()=>{
+      showCourseManager = !showCourseManager;
+      if(showCourseManager) pendingScrollId = 'pl-course-manager';
+      render();
+    };
+
+    const notifyBtn = document.getElementById('pl-enable-notify');
+    if(notifyBtn) notifyBtn.onclick = ()=>{
+      Notification.requestPermission().then(perm=>{
+        if(perm==='granted') checkAndNotify();
+        render();
+      });
+    };
+
+    root.querySelectorAll('.pl-course-color').forEach(inp=>{
+      inp.onchange = ()=>{
+        const key = inp.dataset.course.trim().toLowerCase();
+        courseColors[key] = inp.value;
+        saveCourseColors();
+        render();
+      };
+    });
+    root.querySelectorAll('.pl-course-rename').forEach(inp=>{
+      inp.addEventListener('change', ()=>{
+        const oldName = inp.dataset.course;
+        const newName = inp.value.trim();
+        if(newName && newName!==oldName) renameCourse(oldName, newName);
+      });
+    });
+
+    const bulkCompleteBtn = document.getElementById('pl-bulk-complete');
+    if(bulkCompleteBtn) bulkCompleteBtn.onclick = bulkComplete;
+    const bulkDeleteBtn = document.getElementById('pl-bulk-delete');
+    if(bulkDeleteBtn) bulkDeleteBtn.onclick = bulkDelete;
+    const bulkClearBtn = document.getElementById('pl-bulk-clear');
+    if(bulkClearBtn) bulkClearBtn.onclick = ()=>{ selected.clear(); render(); };
+
+    root.querySelectorAll('.pl-select').forEach(cb=>cb.onchange=()=>{
+      const idx = parseInt(cb.dataset.i);
+      if(cb.checked) selected.add(idx); else selected.delete(idx);
+      pendingAnchorId = cb.id;
+      render();
+    });
+
+    root.querySelectorAll('.pl-subtask-toggle').forEach(cb=>cb.onchange=()=>{
+      const it = items[cb.dataset.i];
+      it.subtasks[cb.dataset.si].done = cb.checked;
+      save();
+    });
 
     root.querySelectorAll('.pl-log').forEach(b=>b.onclick=()=>{
       const it = items[b.dataset.i]; it.done = Math.min(it.done+1, it.total); save();
     });
     root.querySelectorAll('.pl-edit').forEach(b=>b.onclick=()=>{
-      editIndex = parseInt(b.dataset.i); render(); window.scrollTo(0,0);
+      editIndex = parseInt(b.dataset.i); pendingFocus = 'title'; render();
     });
     root.querySelectorAll('.pl-complete').forEach(b=>b.onclick=()=>{
       const it = items[b.dataset.i];
       it.completed = !it.completed;
-      if(it.completed) it.done = it.total;
+      if(it.completed){
+        it.done = it.total;
+        it.completedAt = today();
+        logCompletionToday();
+        if(it.recurring) items.push(makeRecurringClone(it));
+      } else {
+        it.completedAt = null;
+        it.archived = false;
+      }
       save();
     });
     root.querySelectorAll('.pl-del').forEach(b=>b.onclick=()=>{
-      if(confirm('Delete this assignment?')){
-        items.splice(b.dataset.i,1); save();
-      }
+      deleteItemAt(parseInt(b.dataset.i));
     });
+
+    // Restore focus to whatever the user was interacting with before this render.
+    if(pendingFocus === 'title'){
+      const t = document.getElementById('pl-title');
+      if(t) t.focus();
+    } else if(pendingFocus){
+      const el = document.getElementById(pendingFocus.id);
+      if(el){
+        el.focus();
+        if(pendingFocus.selStart!=null && el.setSelectionRange){
+          try{ el.setSelectionRange(pendingFocus.selStart, pendingFocus.selEnd); }catch(e){}
+        }
+      }
+    }
+    pendingFocus = null;
+
+    if(pendingScrollId){
+      const scrollEl = document.getElementById(pendingScrollId);
+      if(scrollEl) scrollEl.scrollIntoView({behavior:'smooth', block:'nearest'});
+      pendingScrollId = null;
+    }
+
+    if(pendingAnchorId){
+      const anchorEl = document.getElementById(pendingAnchorId);
+      if(anchorEl && anchorBefore!=null){
+        const newTop = anchorEl.getBoundingClientRect().top;
+        const delta = newTop - anchorBefore;
+        if(Math.abs(delta) > 0.5) window.scrollBy(0, delta);
+      }
+      pendingAnchorId = null;
+    }
   }
   render();
 })();
