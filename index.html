@@ -6,33 +6,37 @@
 <title>Planner</title>
 <link rel="manifest" href="manifest.json">
 <style>
-body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#22293b;}
+body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#e8e6df;background:#14161f;}
 #pl-app{max-width:640px;font-family:inherit;}
 #pl-app .pl-today{background:#22293b;color:#f4f2ec;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;}
 #pl-app .pl-today b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;opacity:0.7;margin-bottom:6px;}
 #pl-app .pl-today .pl-today-row{display:flex;justify-content:space-between;margin-top:4px;}
-#pl-app .pl-card{border-radius:10px;padding:14px;margin-bottom:10px;border-left:4px solid #888;background:rgba(128,128,128,0.06);}
+#pl-app .pl-card{border-radius:10px;padding:14px;margin-bottom:10px;border-left:4px solid #888;background:rgba(255,255,255,0.05);}
 #pl-app .pl-card.pl-done{opacity:0.5;}
 #pl-app .pl-card.pl-locked{opacity:0.6;border-left-color:#999;}
-#pl-app .pl-card.pl-urgent{border-left-color:#af4e2c;}
-#pl-app .pl-card.pl-soon{border-left-color:#b4842a;}
-#pl-app .pl-card.pl-ok{border-left-color:#3c6e5c;}
-#pl-app input,#pl-app select,#pl-app textarea{width:100%;box-sizing:border-box;padding:6px;margin-bottom:8px;border-radius:6px;border:1px solid #ccc;font-family:inherit;}
+#pl-app .pl-card.pl-urgent{border-left-color:#c96a48;}
+#pl-app .pl-card.pl-soon{border-left-color:#d1a24f;}
+#pl-app .pl-card.pl-ok{border-left-color:#4f8b74;}
+#pl-app input,#pl-app select,#pl-app textarea{width:100%;box-sizing:border-box;padding:6px;margin-bottom:8px;border-radius:6px;border:1px solid #3a3f52;background:#1e2130;color:#e8e6df;font-family:inherit;}
 #pl-app textarea{resize:vertical;min-height:50px;}
-#pl-app button{padding:6px 12px;border-radius:6px;border:none;background:#3c6e5c;color:#fff;cursor:pointer;font-size:13px;margin-right:4px;margin-top:4px;}
-#pl-app button.pl-secondary{background:#888;}
-#pl-app button.pl-complete{background:#3c6e5c;}
-#pl-app button.pl-danger{background:#af4e2c;}
-#pl-app .pl-bar{background:#eee;border-radius:4px;height:8px;overflow:hidden;margin:8px 0;}
-#pl-app .pl-fill{background:#3c6e5c;height:100%;}
+#pl-app button{padding:6px 12px;border-radius:6px;border:none;background:#4f8b74;color:#fff;cursor:pointer;font-size:13px;margin-right:4px;margin-top:4px;}
+#pl-app button.pl-secondary{background:#5a5f72;}
+#pl-app button.pl-complete{background:#4f8b74;}
+#pl-app button.pl-danger{background:#c96a48;}
+#pl-app .pl-bar{background:#2a2d3d;border-radius:4px;height:8px;overflow:hidden;margin:8px 0;}
+#pl-app .pl-fill{background:#4f8b74;height:100%;}
 #pl-app .pl-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-top:6px;}
 #pl-app .pl-tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;color:#fff;margin-bottom:4px;}
 #pl-app .pl-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0;font-size:13px;}
 #pl-app .pl-controls select,#pl-app .pl-controls input{width:auto;margin-bottom:0;}
 #pl-app .pl-io{display:flex;gap:8px;margin-bottom:14px;}
-#pl-app .pl-io button{background:#555;}
-#pl-app .pl-waiting{font-style:italic;color:#888;}
-#pl-app .pl-notes{font-size:12.5px;color:#666;margin-top:4px;white-space:pre-wrap;}
+#pl-app .pl-io button{background:#5a5f72;}
+#pl-app .pl-waiting{font-style:italic;color:#999;}
+#pl-app .pl-notes{font-size:12.5px;color:#9a9a9a;margin-top:4px;white-space:pre-wrap;}
+#pl-modal-backdrop{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;box-sizing:border-box;}
+#pl-modal-box{background:#1e2130;color:#e8e6df;border-radius:12px;padding:20px;max-width:420px;width:100%;max-height:90vh;overflow-y:auto;position:relative;box-shadow:0 10px 40px rgba(0,0,0,0.5);}
+#pl-modal-close{position:absolute;top:10px;right:14px;background:none;border:none;font-size:24px;line-height:1;color:#9a9a9a;cursor:pointer;padding:0;margin:0;}
+#pl-modal-close:hover{color:#e8e6df;}
 </style>
 </head>
 <body>
@@ -47,6 +51,7 @@ navigator.serviceWorker.register('sw.js');
   const KEY='pl-assignments';
   let items = JSON.parse(localStorage.getItem(KEY) || '[]');
   let editIndex = null;
+  let showForm = false;
   let sortMode = 'urgency';
   let hideDone = false;
   let courseFilter = '';
@@ -121,15 +126,9 @@ navigator.serviceWorker.register('sw.js');
   }
 
   function render(){
-    let html = `<div class="pl-io">
-      <button id="pl-export">Export Backup</button>
-      <label style="display:inline-block;">
-        <button id="pl-import-btn" class="pl-secondary">Import Backup</button>
-        <input type="file" id="pl-import" accept="application/json" style="display:none;">
-      </label>
-    </div>`;
+    let html = '';
 
-    html += formHtml(editIndex!==null ? items[editIndex] : null);
+    html += `<button id="pl-add-toggle" style="margin-bottom:14px;">+ Add Assignment</button>`;
 
     html += `<div class="pl-controls">
       <label>Sort: <select id="pl-sort">
@@ -197,7 +196,37 @@ navigator.serviceWorker.register('sw.js');
         </div>
       </div>`;
     });
+
+    html += `<div class="pl-io">
+      <button id="pl-export">Export Backup</button>
+      <label style="display:inline-block;">
+        <button id="pl-import-btn" class="pl-secondary">Import Backup</button>
+        <input type="file" id="pl-import" accept="application/json" style="display:none;">
+      </label>
+    </div>`;
+
+    if(editIndex!==null || showForm){
+      html += `<div id="pl-modal-backdrop">
+        <div id="pl-modal-box">
+          <button id="pl-modal-close" aria-label="Close">&times;</button>
+          ${formHtml(editIndex!==null ? items[editIndex] : null)}
+        </div>
+      </div>`;
+    }
+
     root.innerHTML = html;
+
+    const addToggle = document.getElementById('pl-add-toggle');
+    if(addToggle) addToggle.onclick = ()=>{ showForm = true; render(); };
+
+    const modalBackdrop = document.getElementById('pl-modal-backdrop');
+    if(modalBackdrop){
+      modalBackdrop.addEventListener('click', (e)=>{
+        if(e.target === modalBackdrop){ editIndex=null; showForm=false; render(); }
+      });
+    }
+    const modalClose = document.getElementById('pl-modal-close');
+    if(modalClose) modalClose.onclick = ()=>{ editIndex=null; showForm=false; render(); };
 
     document.getElementById('pl-export').onclick = exportData;
     document.getElementById('pl-import-btn').onclick = ()=> document.getElementById('pl-import').click();
@@ -205,33 +234,40 @@ navigator.serviceWorker.register('sw.js');
       if(e.target.files[0]) importData(e.target.files[0]);
     };
 
-    document.getElementById('pl-course').addEventListener('input', (e)=>{
-      const dependsSelect = document.getElementById('pl-depends');
-      const existing = editIndex!==null ? items[editIndex] : null;
-      dependsSelect.innerHTML = dependsOptionsHtml(e.target.value, '', existing);
-    });
+    const courseField = document.getElementById('pl-course');
+    if(courseField){
+      courseField.addEventListener('input', (e)=>{
+        const dependsSelect = document.getElementById('pl-depends');
+        const existing = editIndex!==null ? items[editIndex] : null;
+        dependsSelect.innerHTML = dependsOptionsHtml(e.target.value, '', existing);
+      });
+    }
 
-    document.getElementById('pl-save').onclick = ()=>{
-      const title = document.getElementById('pl-title').value.trim();
-      const course = document.getElementById('pl-course').value.trim();
-      const due = document.getElementById('pl-due').value;
-      const total = parseFloat(document.getElementById('pl-units').value);
-      const unit = document.getElementById('pl-unitlabel').value.trim() || 'units';
-      const notes = document.getElementById('pl-notes').value.trim();
-      const dependsOn = document.getElementById('pl-depends').value;
-      if(!title||!due||!total) return alert('Fill in title, due date, and total amount');
-      if(editIndex!==null){
-        const it = items[editIndex];
-        it.title=title; it.course=course; it.due=due; it.total=total; it.unit=unit; it.notes=notes; it.dependsOn=dependsOn;
-        it.done = Math.min(it.done, total);
-        editIndex = null;
-      } else {
-        items.push({title,course,due,total,unit,notes,done:0,completed:false,dependsOn});
-      }
-      save();
-    };
+    const saveBtn = document.getElementById('pl-save');
+    if(saveBtn){
+      saveBtn.onclick = ()=>{
+        const title = document.getElementById('pl-title').value.trim();
+        const course = document.getElementById('pl-course').value.trim();
+        const due = document.getElementById('pl-due').value;
+        const total = parseFloat(document.getElementById('pl-units').value);
+        const unit = document.getElementById('pl-unitlabel').value.trim() || 'units';
+        const notes = document.getElementById('pl-notes').value.trim();
+        const dependsOn = document.getElementById('pl-depends').value;
+        if(!title||!due||!total) return alert('Fill in title, due date, and total amount');
+        if(editIndex!==null){
+          const it = items[editIndex];
+          it.title=title; it.course=course; it.due=due; it.total=total; it.unit=unit; it.notes=notes; it.dependsOn=dependsOn;
+          it.done = Math.min(it.done, total);
+          editIndex = null;
+        } else {
+          items.push({title,course,due,total,unit,notes,done:0,completed:false,dependsOn});
+        }
+        showForm = false;
+        save();
+      };
+    }
     const cancelBtn = document.getElementById('pl-cancel');
-    if(cancelBtn) cancelBtn.onclick = ()=>{ editIndex=null; render(); };
+    if(cancelBtn) cancelBtn.onclick = ()=>{ editIndex=null; showForm=false; render(); };
 
     document.getElementById('pl-sort').onchange = (e)=>{ sortMode=e.target.value; render(); };
     document.getElementById('pl-hide').onchange = (e)=>{ hideDone=e.target.checked; render(); };
