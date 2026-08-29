@@ -1,0 +1,258 @@
+Planner
+=======
+
+.. raw:: html
+
+   <div id="pl-app"></div>
+   <link rel="manifest" href="manifest.json">
+    <script>
+    if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js');
+    }
+    </script>
+   <style>
+   #pl-app{max-width:640px;font-family:inherit;}
+   #pl-app .pl-today{background:#22293b;color:#f4f2ec;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;}
+   #pl-app .pl-today b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;opacity:0.7;margin-bottom:6px;}
+   #pl-app .pl-today .pl-today-row{display:flex;justify-content:space-between;margin-top:4px;}
+   #pl-app .pl-card{border-radius:10px;padding:14px;margin-bottom:10px;border-left:4px solid #888;background:rgba(128,128,128,0.06);}
+   #pl-app .pl-card.pl-done{opacity:0.5;}
+   #pl-app .pl-card.pl-locked{opacity:0.6;border-left-color:#999;}
+   #pl-app .pl-card.pl-urgent{border-left-color:#af4e2c;}
+   #pl-app .pl-card.pl-soon{border-left-color:#b4842a;}
+   #pl-app .pl-card.pl-ok{border-left-color:#3c6e5c;}
+   #pl-app input,#pl-app select,#pl-app textarea{width:100%;box-sizing:border-box;padding:6px;margin-bottom:8px;border-radius:6px;border:1px solid #ccc;font-family:inherit;}
+   #pl-app textarea{resize:vertical;min-height:50px;}
+   #pl-app button{padding:6px 12px;border-radius:6px;border:none;background:#3c6e5c;color:#fff;cursor:pointer;font-size:13px;margin-right:4px;margin-top:4px;}
+   #pl-app button.pl-secondary{background:#888;}
+   #pl-app button.pl-complete{background:#3c6e5c;}
+   #pl-app button.pl-danger{background:#af4e2c;}
+   #pl-app .pl-bar{background:#eee;border-radius:4px;height:8px;overflow:hidden;margin:8px 0;}
+   #pl-app .pl-fill{background:#3c6e5c;height:100%;}
+   #pl-app .pl-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-top:6px;}
+   #pl-app .pl-tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;color:#fff;margin-bottom:4px;}
+   #pl-app .pl-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0;font-size:13px;}
+   #pl-app .pl-controls select,#pl-app .pl-controls input{width:auto;margin-bottom:0;}
+   #pl-app .pl-io{display:flex;gap:8px;margin-bottom:14px;}
+   #pl-app .pl-io button{background:#555;}
+   #pl-app .pl-waiting{font-style:italic;color:#888;}
+   #pl-app .pl-notes{font-size:12.5px;color:#666;margin-top:4px;white-space:pre-wrap;}
+   </style>
+   <script>
+   (function(){
+     const KEY='pl-assignments';
+     let items = JSON.parse(localStorage.getItem(KEY) || '[]');
+     let editIndex = null;
+     let sortMode = 'urgency';
+     let hideDone = false;
+     let courseFilter = '';
+     const root = document.getElementById('pl-app');
+
+     const colors = ['#3c6e5c','#b4842a','#af4e2c','#4a5a8c','#7a4a8c'];
+     function courseColor(course){
+       if(!course) return '#888';
+       let h=0; for(let c of course) h = (h*31 + c.charCodeAt(0))>>>0;
+       return colors[h % colors.length];
+     }
+
+     function save(){ localStorage.setItem(KEY, JSON.stringify(items)); render(); }
+     function today(){ const d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
+     function daysBetween(a,b){ return Math.round((new Date(b)-new Date(a))/86400000); }
+     function urgencyClass(daysLeft, completed){
+       if(completed) return '';
+       if(daysLeft<=2) return 'pl-urgent';
+       if(daysLeft<=5) return 'pl-soon';
+       return 'pl-ok';
+     }
+     function fmt(n){ return Number.isInteger(n)? n : Math.round(n*10)/10; }
+
+     function isLocked(it){
+       if(!it.dependsOn) return false;
+       const prereq = items.find(x=>x.title===it.dependsOn);
+       return prereq ? !prereq.completed : false;
+     }
+
+     function dependsOptionsHtml(course, selected, excludeItem){
+       const matches = items.filter(it => it!==excludeItem && (it.course||'').trim().toLowerCase() === (course||'').trim().toLowerCase() && course);
+       return `<option value="">No prerequisite</option>` +
+         matches.map(it=>`<option value="${it.title}" ${selected===it.title?'selected':''}>${it.title}</option>`).join('');
+     }
+
+     function formHtml(existing){
+       const e = existing || {title:'',due:'',total:'',course:'',unit:'units',dependsOn:'',notes:''};
+       return `<h3>${existing? 'Edit Assignment' : 'Add Assignment'}</h3>
+         <input id="pl-title" placeholder="Title" value="${e.title}">
+         <input id="pl-course" placeholder="Course (e.g. NT)" value="${e.course||''}">
+         <input id="pl-due" type="date" value="${e.due}">
+         <input id="pl-units" type="number" placeholder="Total amount" value="${e.total}">
+         <input id="pl-unitlabel" placeholder="Unit (pages, hours, problems...)" value="${e.unit||''}">
+         <textarea id="pl-notes" placeholder="Notes (optional)">${e.notes||''}</textarea>
+         <label style="font-size:12px;color:#888;">Do this after (same course only):</label>
+         <select id="pl-depends">
+           ${dependsOptionsHtml(e.course, e.dependsOn, existing)}
+         </select>
+         <button id="pl-save">${existing? 'Save Changes' : 'Add'}</button>
+         ${existing? '<button id="pl-cancel" class="pl-secondary">Cancel</button>' : ''}
+         <hr>`;
+     }
+
+     function exportData(){
+       const blob = new Blob([JSON.stringify(items,null,2)], {type:'application/json'});
+       const url = URL.createObjectURL(blob);
+       const a = document.createElement('a');
+       a.href = url; a.download = 'planner-backup.json'; a.click();
+       URL.revokeObjectURL(url);
+     }
+
+     function importData(file){
+       const reader = new FileReader();
+       reader.onload = (e)=>{
+         try{
+           const data = JSON.parse(e.target.result);
+           if(Array.isArray(data)){ items = data; save(); }
+           else alert('Invalid file format');
+         }catch(err){ alert('Could not read file'); }
+       };
+       reader.readAsText(file);
+     }
+
+     function render(){
+       let html = `<div class="pl-io">
+         <button id="pl-export">Export Backup</button>
+         <label style="display:inline-block;">
+           <button id="pl-import-btn" class="pl-secondary">Import Backup</button>
+           <input type="file" id="pl-import" accept="application/json" style="display:none;">
+         </label>
+       </div>`;
+
+       html += formHtml(editIndex!==null ? items[editIndex] : null);
+
+       html += `<div class="pl-controls">
+         <label>Sort: <select id="pl-sort">
+           <option value="urgency" ${sortMode==='urgency'?'selected':''}>Urgency</option>
+           <option value="due" ${sortMode==='due'?'selected':''}>Due date</option>
+         </select></label>
+         <label><input type="checkbox" id="pl-hide" style="width:auto;" ${hideDone?'checked':''}> Hide completed</label>
+         <input id="pl-filter" placeholder="Filter by course..." value="${courseFilter}">
+       </div>`;
+
+       let list = items.map((it,i)=>({it,i}));
+       if(hideDone) list = list.filter(x=>!x.it.completed);
+       if(courseFilter) list = list.filter(x=>(x.it.course||'').toLowerCase().includes(courseFilter.toLowerCase()));
+       if(sortMode==='due') list.sort((a,b)=>a.it.due.localeCompare(b.it.due));
+       else list.sort((a,b)=>{
+         if(!!a.it.completed !== !!b.it.completed) return a.it.completed?1:-1;
+         return daysBetween(today(),a.it.due) - daysBetween(today(),b.it.due);
+       });
+
+       // Today's targets summary (always across ALL active, unlocked items, ignoring filter)
+       const active = items.filter(x=>!x.completed && !isLocked(x));
+       const multi = active.filter(it=>it.total>1);
+       const singles = active.filter(it=>it.total<=1 && it.done<it.total).sort((a,b)=>a.due.localeCompare(b.due));
+
+       const multiTargets = multi.map(it=>{
+         const left = Math.max(it.total-it.done,0);
+         const daysLeft = Math.max(daysBetween(today(), it.due),1);
+         return {title:it.title, unit:it.unit||'units', amt: left>0? Math.ceil(left/daysLeft) : 0};
+       }).filter(t=>t.amt>0);
+
+       const singleTargets = singles.slice(0,2).map(it=>({title:it.title, unit:it.unit||'reading', amt:1}));
+
+       const targets = multiTargets.concat(singleTargets);
+
+       html = `<div class="pl-today"><b>Today's Targets</b>` +
+         (targets.length? targets.map(t=>`<div class="pl-today-row"><span>${t.title}</span><span>${fmt(t.amt)} ${t.unit}</span></div>`).join('')
+           : '<div class="pl-today-row"><span>Nothing due today \u2014 you\'re caught up.</span></div>') +
+         `</div>` + html;
+
+       list.forEach(({it,i})=>{
+         const locked = isLocked(it);
+         const left = Math.max(it.total-it.done,0);
+         const daysLeft = daysBetween(today(), it.due);
+         const effDays = Math.max(daysLeft,1);
+         const target = (left>0 && !it.completed) ? Math.ceil(left/effDays) : 0;
+         const pct = Math.min(100, Math.round((it.done/it.total)*100));
+         const unit = it.unit || 'units';
+         const cls = locked ? 'pl-locked' : urgencyClass(daysLeft, it.completed);
+         const statusText = it.completed ? 'Completed'
+           : locked ? `<span class="pl-waiting">Waiting on: ${it.dependsOn}</span>`
+           : (left>0? target+' '+unit+'/day':'Done');
+         html += `<div class="pl-card ${it.completed?'pl-done':''} ${cls}">
+           ${it.course? `<span class="pl-tag" style="background:${courseColor(it.course)}">${it.course}</span>` : ''}
+           <div><b>${it.title}</b></div>
+           ${it.notes? `<div class="pl-notes">${it.notes}</div>` : ''}
+           <div class="pl-row"><span>Due ${it.due}</span><span>${statusText}</span></div>
+           <div class="pl-bar"><div class="pl-fill" style="width:${pct}%"></div></div>
+           <div class="pl-row">
+             <span>${fmt(it.done)}/${fmt(it.total)} ${unit}</span>
+             <span>
+               ${(!it.completed && !locked && it.total>1)? `<button data-i="${i}" class="pl-log">+1</button>` : ''}
+               ${!locked? `<button data-i="${i}" class="pl-complete">${it.completed? 'Reopen':'Complete'}</button>` : ''}
+               <button data-i="${i}" class="pl-edit pl-secondary">Edit</button>
+               <button data-i="${i}" class="pl-del pl-danger">Delete</button>
+             </span>
+           </div>
+         </div>`;
+       });
+       root.innerHTML = html;
+
+       document.getElementById('pl-export').onclick = exportData;
+       document.getElementById('pl-import-btn').onclick = ()=> document.getElementById('pl-import').click();
+       document.getElementById('pl-import').onchange = (e)=>{
+         if(e.target.files[0]) importData(e.target.files[0]);
+       };
+
+       // Live-update the prerequisite dropdown as the course field changes
+       document.getElementById('pl-course').addEventListener('input', (e)=>{
+         const dependsSelect = document.getElementById('pl-depends');
+         const existing = editIndex!==null ? items[editIndex] : null;
+         dependsSelect.innerHTML = dependsOptionsHtml(e.target.value, '', existing);
+       });
+
+       document.getElementById('pl-save').onclick = ()=>{
+         const title = document.getElementById('pl-title').value.trim();
+         const course = document.getElementById('pl-course').value.trim();
+         const due = document.getElementById('pl-due').value;
+         const total = parseFloat(document.getElementById('pl-units').value);
+         const unit = document.getElementById('pl-unitlabel').value.trim() || 'units';
+         const notes = document.getElementById('pl-notes').value.trim();
+         const dependsOn = document.getElementById('pl-depends').value;
+         if(!title||!due||!total) return alert('Fill in title, due date, and total amount');
+         if(editIndex!==null){
+           const it = items[editIndex];
+           it.title=title; it.course=course; it.due=due; it.total=total; it.unit=unit; it.notes=notes; it.dependsOn=dependsOn;
+           it.done = Math.min(it.done, total);
+           editIndex = null;
+         } else {
+           items.push({title,course,due,total,unit,notes,done:0,completed:false,dependsOn});
+         }
+         save();
+       };
+       const cancelBtn = document.getElementById('pl-cancel');
+       if(cancelBtn) cancelBtn.onclick = ()=>{ editIndex=null; render(); };
+
+       document.getElementById('pl-sort').onchange = (e)=>{ sortMode=e.target.value; render(); };
+       document.getElementById('pl-hide').onchange = (e)=>{ hideDone=e.target.checked; render(); };
+       document.getElementById('pl-filter').oninput = (e)=>{ courseFilter=e.target.value; render(); };
+
+       root.querySelectorAll('.pl-log').forEach(b=>b.onclick=()=>{
+         const it = items[b.dataset.i]; it.done = Math.min(it.done+1, it.total); save();
+       });
+       root.querySelectorAll('.pl-edit').forEach(b=>b.onclick=()=>{
+         editIndex = parseInt(b.dataset.i); render(); window.scrollTo(0,0);
+       });
+       root.querySelectorAll('.pl-complete').forEach(b=>b.onclick=()=>{
+         const it = items[b.dataset.i];
+         it.completed = !it.completed;
+         if(it.completed) it.done = it.total;
+         save();
+       });
+       root.querySelectorAll('.pl-del').forEach(b=>b.onclick=()=>{
+         if(confirm('Delete this assignment?')){
+           items.splice(b.dataset.i,1); save();
+         }
+       });
+     }
+     render();
+   })();
+   </script>
