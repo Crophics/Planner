@@ -34,8 +34,8 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
   #pl-app .pl-io{gap:6px;}
   #pl-app .pl-actions-row{gap:8px;}
   #pl-app .pl-actions-row > span:first-child{flex:0 0 auto;white-space:nowrap;}
-  #pl-app .pl-actions{display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;justify-content:flex-end;}
-  #pl-app .pl-actions button{flex:0 0 auto;margin:0;padding:9px 12px;font-size:12.5px;white-space:nowrap;min-height:38px;display:inline-flex;align-items:center;}
+  #pl-app .pl-actions{display:flex;flex:1 1 auto;min-width:0;flex-wrap:nowrap;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;}
+  #pl-app .pl-actions button{flex:0 0 auto;margin:0;padding:7px 10px;font-size:12.5px;white-space:nowrap;min-height:34px;display:inline-flex;align-items:center;}
 }
 #pl-app{max-width:640px;font-family:inherit;padding-bottom:calc(90px + env(safe-area-inset-bottom));}
 #pl-app .pl-today{background:var(--pl-today-bg);color:var(--pl-today-fg);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;}
@@ -314,7 +314,7 @@ if ('serviceWorker' in navigator) {
     save();
   }
 
-  function save(){ localStorage.setItem(KEY, JSON.stringify(items)); render(true); }
+  function save(){ localStorage.setItem(KEY, JSON.stringify(items)); render(); }
   function today(){ const d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
   function daysBetween(a,b){ return Math.round((new Date(b)-new Date(a))/86400000); }
   function addDays(dateStr, n){ const d=new Date(dateStr+'T00:00:00'); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
@@ -611,7 +611,7 @@ if ('serviceWorker' in navigator) {
     </div>`;
   }
 
-  function render(animate){
+  function render(){
     currentColorMap = computeCourseColorMap();
 
     let anchorBefore = null;
@@ -728,7 +728,7 @@ if ('serviceWorker' in navigator) {
           </div>
         </div>
         <div class="pl-row"><span>Due ${it.due}</span><span>${statusText}</span></div>
-        <div class="pl-bar"><div class="pl-fill" style="width:${pct}%"></div></div>
+        <div class="pl-bar"><div class="pl-fill" data-fill-key="${i}" style="width:${pct}%"></div></div>
         <div class="pl-row pl-actions-row">
           <span>${fmt(it.done)}/${fmt(it.total)} ${unit}</span>
           <span class="pl-actions">
@@ -806,12 +806,22 @@ if ('serviceWorker' in navigator) {
 
     html += `<button id="pl-add-toggle" class="pl-fab" aria-label="Add Assignment">+</button>`;
 
-    const applyDom = () => { root.innerHTML = html; };
-    if(animate && document.startViewTransition){
-      document.startViewTransition(applyDom);
-    } else {
-      applyDom();
-    }
+    const prevFills = {};
+    root.querySelectorAll('[data-fill-key]').forEach(el=>{
+      prevFills[el.dataset.fillKey] = el.style.width;
+    });
+
+    root.innerHTML = html;
+
+    root.querySelectorAll('[data-fill-key]').forEach(el=>{
+      const key = el.dataset.fillKey;
+      const newWidth = el.style.width;
+      if(prevFills[key] !== undefined && prevFills[key] !== newWidth){
+        el.style.width = prevFills[key];
+        void el.offsetWidth;
+        requestAnimationFrame(()=>{ el.style.width = newWidth; });
+      }
+    });
 
     const addToggle = document.getElementById('pl-add-toggle');
     if(addToggle) addToggle.onclick = ()=>{ showForm = true; pendingFocus = 'title'; render(); };
