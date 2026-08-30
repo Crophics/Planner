@@ -31,8 +31,11 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
   #pl-app .pl-card{padding:12px;}
   #pl-app .pl-controls{gap:6px;}
   #pl-app .pl-io{gap:6px;}
+  #pl-app .pl-actions-row{flex-direction:column;align-items:stretch;gap:6px;}
+  #pl-app .pl-actions{display:flex;gap:4px;flex-wrap:nowrap;}
+  #pl-app .pl-actions button{flex:1 1 0;min-width:0;margin:0;padding:6px 2px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;}
 }
-#pl-app{max-width:640px;font-family:inherit;}
+#pl-app{max-width:640px;font-family:inherit;padding-bottom:90px;}
 #pl-app .pl-today{background:var(--pl-today-bg);color:var(--pl-today-fg);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;}
 #pl-app .pl-today b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;opacity:0.7;margin-bottom:6px;}
 #pl-app .pl-today .pl-today-row{display:flex;justify-content:space-between;margin-top:4px;gap:8px;}
@@ -80,6 +83,7 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
   width:56px;
   height:56px;
   border-radius:50%;
+  clip-path:circle(50%);
   background:#4f8b74;
   color:#fff;
   font-size:28px;
@@ -709,9 +713,9 @@ if ('serviceWorker' in navigator) {
         </div>
         <div class="pl-row"><span>Due ${it.due}</span><span>${statusText}</span></div>
         <div class="pl-bar"><div class="pl-fill" style="width:${pct}%"></div></div>
-        <div class="pl-row">
+        <div class="pl-row pl-actions-row">
           <span>${fmt(it.done)}/${fmt(it.total)} ${unit}</span>
-          <span>
+          <span class="pl-actions">
             ${sortMode==='custom'? `<button data-pos="${pos}" class="pl-move-up pl-secondary" ${pos===0?'disabled':''}>\u2191</button><button data-pos="${pos}" class="pl-move-down pl-secondary" ${pos===list.length-1?'disabled':''}>\u2193</button>` : ''}
             ${(!it.completed && !locked && it.total>1)? `<button data-i="${i}" class="pl-log">+1</button>` : ''}
             ${!locked? `<button data-i="${i}" class="pl-complete">${it.completed? 'Reopen':'Complete'}</button>` : ''}
