@@ -75,14 +75,7 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
 #pl-app .pl-topbar{display:flex;gap:8px;align-items:center;margin-bottom:10px;}
 #pl-app .pl-topbar input{width:200px;margin-bottom:0;}
 #pl-app .pl-topbar button{margin:0;white-space:nowrap;}
-#pl-app details.pl-completed-dropdown{position:relative;display:inline-block;}
-#pl-app details.pl-completed-dropdown summary{
-  cursor:pointer;list-style:none;display:inline-block;
-  padding:6px;border-radius:6px;border:1px solid var(--pl-border);
-  background:var(--pl-input-bg);color:var(--pl-fg);font-size:13px;font-family:inherit;
-}
-#pl-app details.pl-completed-dropdown summary::-webkit-details-marker{display:none;}
-#pl-app .pl-dropdown-panel{position:absolute;top:100%;left:0;background:var(--pl-modal-bg);border:1px solid var(--pl-border);border-radius:8px;padding:8px 10px;margin-top:4px;z-index:50;white-space:nowrap;box-shadow:0 4px 12px var(--pl-modal-shadow);}
+#pl-app .pl-controls select[multiple]{height:32px;overflow-y:auto;}
 #pl-app .pl-dropdown-panel label{display:flex;align-items:center;gap:6px;font-size:13px;margin-bottom:6px;}
 #pl-app .pl-dropdown-panel label:last-child{margin-bottom:0;}
 #pl-app .pl-dropdown-panel input[type="checkbox"]{width:auto;margin:0;}
@@ -566,13 +559,10 @@ if ('serviceWorker' in navigator) {
         <option value="due" ${sortMode==='due'?'selected':''}>Due date</option>
         <option value="custom" ${sortMode==='custom'?'selected':''}>Custom (drag order)</option>
       </select></label>
-      <label>Completed: <details class="pl-completed-dropdown">
-        <summary>Filter \u25be</summary>
-        <div class="pl-dropdown-panel">
-          <label><input type="checkbox" id="pl-show-completed" ${!hideDone?'checked':''}> Show completed</label>
-          <label><input type="checkbox" id="pl-show-archived" ${showArchived?'checked':''}> Show archived</label>
-        </div>
-      </details></label>
+      <label>Completed: <select id="pl-completed-multi" multiple size="1">
+        <option value="completed" ${!hideDone?'selected':''}>Show completed</option>
+        <option value="archived" ${showArchived?'selected':''}>Show archived</option>
+      </select></label>
     </div>`;
 
     const totalActive = items.filter(i=>!i.completed).length;
@@ -804,8 +794,12 @@ if ('serviceWorker' in navigator) {
     if(cancelBtn) cancelBtn.onclick = ()=>{ editIndex=null; showForm=false; render(); };
 
     document.getElementById('pl-sort').onchange = (e)=>{ sortMode=e.target.value; savePrefs(); render(); };
-    document.getElementById('pl-show-completed').onchange = (e)=>{ hideDone = !e.target.checked; savePrefs(); render(); };
-    document.getElementById('pl-show-archived').onchange = (e)=>{ showArchived = e.target.checked; savePrefs(); render(); };
+    document.getElementById('pl-completed-multi').onchange = (e)=>{
+      const selected = Array.from(e.target.selectedOptions).map(o=>o.value);
+      hideDone = !selected.includes('completed');
+      showArchived = selected.includes('archived');
+      savePrefs(); render();
+    };
     document.getElementById('pl-filter').oninput = (e)=>{
       pendingFocus = {id:'pl-filter', selStart:e.target.selectionStart, selEnd:e.target.selectionEnd};
       searchTerm=e.target.value; savePrefs(); render();
