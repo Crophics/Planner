@@ -75,8 +75,12 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
 #pl-app .pl-topbar{display:flex;gap:8px;align-items:center;margin-bottom:10px;}
 #pl-app .pl-topbar input{width:200px;margin-bottom:0;}
 #pl-app .pl-topbar button{margin:0;white-space:nowrap;}
-#pl-app details.pl-completed-dropdown{position:relative;}
-#pl-app details.pl-completed-dropdown summary{cursor:pointer;list-style:none;padding:4px 0;}
+#pl-app details.pl-completed-dropdown{position:relative;display:inline-block;}
+#pl-app details.pl-completed-dropdown summary{
+  cursor:pointer;list-style:none;display:inline-block;
+  padding:6px;border-radius:6px;border:1px solid var(--pl-border);
+  background:var(--pl-input-bg);color:var(--pl-fg);font-size:13px;font-family:inherit;
+}
 #pl-app details.pl-completed-dropdown summary::-webkit-details-marker{display:none;}
 #pl-app .pl-dropdown-panel{position:absolute;top:100%;left:0;background:var(--pl-modal-bg);border:1px solid var(--pl-border);border-radius:8px;padding:8px 10px;margin-top:4px;z-index:50;white-space:nowrap;box-shadow:0 4px 12px var(--pl-modal-shadow);}
 #pl-app .pl-dropdown-panel label{display:flex;align-items:center;gap:6px;font-size:13px;margin-bottom:6px;}
@@ -562,13 +566,13 @@ if ('serviceWorker' in navigator) {
         <option value="due" ${sortMode==='due'?'selected':''}>Due date</option>
         <option value="custom" ${sortMode==='custom'?'selected':''}>Custom (drag order)</option>
       </select></label>
-      <details class="pl-completed-dropdown">
-        <summary>Completed \u25be</summary>
+      <label>Completed: <details class="pl-completed-dropdown">
+        <summary>Filter \u25be</summary>
         <div class="pl-dropdown-panel">
           <label><input type="checkbox" id="pl-show-completed" ${!hideDone?'checked':''}> Show completed</label>
           <label><input type="checkbox" id="pl-show-archived" ${showArchived?'checked':''}> Show archived</label>
         </div>
-      </details>
+      </details></label>
     </div>`;
 
     const totalActive = items.filter(i=>!i.completed).length;
