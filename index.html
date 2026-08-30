@@ -519,6 +519,14 @@ if ('serviceWorker' in navigator) {
     saveDevMode();
     showToast('Dev mode enabled');
   }
+  function deactivateDevMode(){
+    if(!devMode) return;
+    devMode = false;
+    devPanelOpen = false;
+    saveDevMode();
+    saveDevPanelOpen();
+    showToast('Dev mode disabled');
+  }
   function asDate(dateStr){ return new Date(dateStr + 'T00:00:00'); }
   function today(){
     const d = new Date();
@@ -1241,6 +1249,7 @@ if ('serviceWorker' in navigator) {
         <button type="button" id="pl-dev-advance-1">⏩ Advance Time +1 Day</button>
         <button type="button" id="pl-dev-advance-7">⏩ Advance Time +7 Days</button>
         <button type="button" id="pl-dev-reset">⚠️ Hard Reset Everything</button>
+        <button type="button" id="pl-dev-exit">🚪 Exit Dev Mode</button>
       </div>`;
     }
 
@@ -1554,6 +1563,13 @@ if ('serviceWorker' in navigator) {
           sessionStorage.clear();
           location.reload();
         }
+      };
+    }
+    const devExit = document.getElementById('pl-dev-exit');
+    if(devExit){
+      devExit.onclick = ()=>{
+        deactivateDevMode();
+        render();
       };
     }
 
