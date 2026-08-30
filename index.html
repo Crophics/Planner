@@ -7,6 +7,21 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png">
 <meta name="theme-color" content="#14161f">
+<script>
+(function(){
+  try{
+    var prefs = JSON.parse(localStorage.getItem('pl-prefs')||'{}');
+    var theme = ['dark','light','blue','auto'].includes(prefs.theme) ? prefs.theme : 'blue';
+    var eff = theme;
+    if(theme==='auto'){
+      eff = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    }
+    document.documentElement.setAttribute('data-theme', eff);
+  }catch(e){
+    document.documentElement.setAttribute('data-theme', 'blue');
+  }
+})();
+</script>
 <style>
 :root[data-theme="dark"]{
   --pl-bg:#111111; --pl-fg:#e8e6df; --pl-card-bg:rgba(255,255,255,0.04);
@@ -40,6 +55,10 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
 #pl-app{max-width:640px;font-family:inherit;padding-bottom:calc(90px + env(safe-area-inset-bottom));}
 #pl-app .pl-today{background:var(--pl-today-bg);color:var(--pl-today-fg);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;}
 #pl-app .pl-today b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;opacity:0.7;margin-bottom:6px;}
+#pl-app .pl-today-header-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+#pl-app .pl-today-header-row b{margin-bottom:0;}
+#pl-app .pl-today-toggle-btn{background:none;border:none;color:inherit;opacity:0.6;padding:4px;margin:0;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:50%;width:22px;height:22px;}
+#pl-app .pl-today-toggle-btn:hover{opacity:1;filter:none;background:rgba(255,255,255,0.08);}
 #pl-app .pl-today .pl-today-row{display:flex;justify-content:space-between;align-items:center;margin-top:7px;gap:10px;}
 #pl-app .pl-today-title{display:flex;align-items:center;gap:8px;min-width:0;}
 #pl-app .pl-today-title span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -49,6 +68,7 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
 #pl-app .pl-today-amt{background:rgba(0,0,0,0.18);padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:600;white-space:nowrap;flex:0 0 auto;}
 #pl-app .pl-today-divider{display:flex;align-items:center;gap:8px;margin:12px 0 2px;font-size:10.5px;text-transform:uppercase;letter-spacing:0.6px;opacity:0.55;}
 #pl-app .pl-today-divider::before,#pl-app .pl-today-divider::after{content:'';flex:1;height:1px;background:currentColor;opacity:0.3;}
+#pl-app .pl-today-group-header{font-size:11.5px;font-weight:600;opacity:0.8;margin:8px 0 2px 2px;}
 #pl-app .pl-today-row.pl-today-optional{opacity:0.8;}
 #pl-app .pl-today-row.pl-today-optional .pl-today-amt{background:transparent;border:1px dashed currentColor;opacity:0.7;font-weight:500;}
 #pl-app .pl-today-row.pl-today-clickable{cursor:pointer;border-radius:6px;margin-left:-6px;margin-right:-6px;padding:2px 6px;transition:background 0.15s ease;}
@@ -59,6 +79,12 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
   100%{ box-shadow:0 0 0 0 rgba(79,139,116,0); }
 }
 #pl-app .pl-tight-flag{color:#e2604e;font-size:11px;}
+#pl-app .pl-today-due-hint{color:var(--pl-muted);font-size:10.5px;font-weight:400;flex:0 0 auto;}
+#pl-app .pl-today{cursor:pointer;}
+#pl-app .pl-today-body-anim{overflow:hidden;position:relative;}
+#pl-app .pl-today-body-overlay{position:absolute;top:0;left:0;right:0;transition:opacity 0.3s ease;}
+#pl-app .pl-today-arrow{display:inline-block;font-size:15px;line-height:1;transition:transform 0.3s cubic-bezier(.4,0,.2,1);}
+#pl-app .pl-today-arrow-open{transform:rotate(90deg);}
 @media (max-width: 600px){
   #pl-app .pl-today-title span:first-child{max-width:150px;}
 }
@@ -94,6 +120,12 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
 #pl-app button:active{transform:scale(0.96);}
 #pl-app button:disabled{opacity:0.35;cursor:not-allowed;filter:none;transform:none;}
 #pl-app button:focus-visible,#pl-app input:focus-visible,#pl-app select:focus-visible,#pl-app textarea:focus-visible{outline:2px solid #2ea9dd;outline-offset:2px;}
+#pl-app input.pl-field-error{border-color:#d94535;animation:pl-field-shake 0.3s ease;}
+@keyframes pl-field-shake{
+  0%,100%{ transform:translateX(0); }
+  25%{ transform:translateX(-4px); }
+  75%{ transform:translateX(4px); }
+}
 #pl-app button.pl-secondary{background:#5a5f72;}
 #pl-app button.pl-complete{background:#4f8b74;}
 #pl-app button.pl-danger{background:#c96a48;}
@@ -154,6 +186,9 @@ body, #pl-app .pl-today, #pl-app .pl-week-block, #pl-modal-box, #pl-app input, #
 }
 #pl-app .pl-week-bar, #pl-app .pl-week-bar-stack{
   transform-origin:bottom;
+}
+#pl-app .pl-week-animate .pl-week-bar,
+#pl-app .pl-week-animate .pl-week-bar-stack{
   animation:pl-bar-grow 0.45s cubic-bezier(.22,.9,.32,1.15) both;
 }
 #pl-app .pl-dropdown-panel{
@@ -218,6 +253,7 @@ body, #pl-app .pl-today, #pl-app .pl-week-block, #pl-modal-box, #pl-app input, #
   #pl-toast.pl-toast-anim{ animation:none; }
   #pl-app .pl-week-bar, #pl-app .pl-week-bar-stack{ animation:none; }
   #pl-app .pl-card{ transition:none; }
+  #pl-app input.pl-field-error{ animation:none; }
   body, #pl-app .pl-today, #pl-app .pl-week-block, #pl-modal-box, #pl-app input, #pl-app select, #pl-app textarea, #pl-app .pl-bar, #pl-app .pl-tag{ transition:none; }
 }
 </style>
@@ -262,6 +298,7 @@ if ('serviceWorker' in navigator) {
   let pendingFocus = null;
   let pendingScrollId = null;
   let pendingScrollAlign = 'end';
+  let pendingTodayAnim = false;
   let overdueFilterActive = false;
   let dragSrcIndex = null;
 
@@ -272,6 +309,7 @@ if ('serviceWorker' in navigator) {
   let showArchived = !!prefs.showArchived;
   let searchTerm = prefs.searchTerm || '';
   let theme = ['dark','light','blue','auto'].includes(prefs.theme) ? prefs.theme : 'blue';
+  let todayExpanded = !!prefs.todayExpanded;
 
   let courseColors = {};
   try{ courseColors = JSON.parse(localStorage.getItem(COURSE_COLORS_KEY)) || {}; }catch(e){ courseColors = {}; }
@@ -282,7 +320,7 @@ if ('serviceWorker' in navigator) {
   function saveCompletionLog(){ localStorage.setItem(COMPLETION_LOG_KEY, JSON.stringify(completionLog)); }
 
   function savePrefs(){
-    localStorage.setItem(PREFS_KEY, JSON.stringify({sortMode,hideDone,showArchived,searchTerm,theme}));
+    localStorage.setItem(PREFS_KEY, JSON.stringify({sortMode,hideDone,showArchived,searchTerm,theme,todayExpanded}));
   }
 
   const THEME_COLORS = {dark:'#111111', light:'#f4f2ec', blue:'#14161f'};
@@ -473,6 +511,19 @@ if ('serviceWorker' in navigator) {
     return 'pl-ok';
   }
   function fmt(n){ return Number.isInteger(n)? n : Math.round(n*10)/10; }
+  // Singularizes a plural unit label (e.g. "chapters" -> "chapter") when the
+  // count is exactly 1. Simple trailing-"s" strip covers the common cases
+  // (chapters, pages, problems, readings...); irregular units just won't
+  // singularize, which is a harmless no-op.
+  function unitLabel(amt, unit){
+    if(amt===1 && unit && unit.endsWith('s')) return unit.slice(0,-1);
+    return unit;
+  }
+  // When a unit is shown without a number next to it (just "Reading" instead
+  // of "1 reading"), capitalize it so it reads like a label, not a fragment.
+  function capUnit(unit){
+    return unit ? unit.charAt(0).toUpperCase()+unit.slice(1) : unit;
+  }
 
   function isLocked(it){
     if(!it.dependsOn) return false;
@@ -724,7 +775,7 @@ if ('serviceWorker' in navigator) {
     reader.readAsText(file);
   }
 
-  function weekChartHtml(summaryText){
+  function weekChartHtml(summaryText, animate){
     const days = [];
     for(let i=0;i<7;i++){
       const d = addDays(today(), i);
@@ -754,7 +805,7 @@ if ('serviceWorker' in navigator) {
       }
       return `<div class="pl-week-col">${barHtml}<div class="pl-week-label">${label}</div></div>`;
     }).join('');
-    return `<div class="pl-week-block">
+    return `<div class="pl-week-block${animate?' pl-week-animate':''}">
       <div class="pl-summary">${summaryText}</div>
       <div class="pl-week">${barsHtml}</div>
     </div>`;
@@ -790,7 +841,7 @@ if ('serviceWorker' in navigator) {
     const streak = currentStreak();
     const summaryText = `${totalActive} active \u00b7 ${totalCompleted} completed \u00b7 ${thisWeek} this week${streak>0? ' \u00b7 '+streak+'-day streak':''}`;
 
-    html += weekChartHtml(summaryText);
+    html += weekChartHtml(summaryText, !pendingTodayAnim);
 
     let list = items.map((it,i)=>({it,i}));
     if(!showArchived) list = list.filter(x=>!x.it.archived);
@@ -826,45 +877,169 @@ if ('serviceWorker' in navigator) {
     const multi = active.filter(it=>it.total>1);
     const singles = active.filter(it=>it.total<=1 && it.done<it.total);
 
+    // Each multi-part item's daily target is locked in once per day (a snapshot
+    // of "how much left, how much done so far today") so that logging progress
+    // counts DOWN toward finishing today's target, instead of the target itself
+    // shrinking to match — which made it impossible to ever hit "done for today"
+    // short of finishing the whole assignment. Recomputed if the day rolls over
+    // or the assignment's total/due date changes (edited mid-day).
+    let dailyTargetsChanged = false;
+    multi.forEach(it=>{
+      const t = today();
+      const dt = it.dailyTarget;
+      if(!dt || dt.date!==t || dt.total!==it.total || dt.due!==it.due){
+        const left = Math.max(it.total-it.done,0);
+        const daysLeft = Math.max(daysBetween(t, it.due),1);
+        it.dailyTarget = {
+          date: t, startDone: it.done, total: it.total, due: it.due,
+          amt: left>0? Math.ceil(left/daysLeft) : 0
+        };
+        dailyTargetsChanged = true;
+      }
+    });
+    if(dailyTargetsChanged) localStorage.setItem(KEY, JSON.stringify(items));
+
+    // Multi-part items only need partial progress *today* when there's no slack left
+    // in the schedule — i.e. the segments remaining are >= the days remaining, so
+    // every remaining day has to be used to finish on time. With more days than
+    // segments left (e.g. 2 chapters due in 5 days), there's room to start later,
+    // so it's credit-eligible today rather than required. `tight` (red dot) is the
+    // sharper case: due today or overdue, where there's truly zero room left.
     const multiTargets = multi.map(it=>{
       const left = Math.max(it.total-it.done,0);
       const daysLeft = Math.max(daysBetween(today(), it.due),1);
-      return {it, title:it.title, unit:it.unit||'units', amt: left>0? Math.ceil(left/daysLeft) : 0, tight: it.due<today()};
+      const progressToday = Math.max(it.done - it.dailyTarget.startDone, 0);
+      const remainingToday = Math.max(it.dailyTarget.amt - progressToday, 0);
+      return {
+        it, title:it.title, unit:it.unit||'units',
+        amt: remainingToday,
+        tight: it.due<=today(),
+        noSlack: left>=daysLeft
+      };
     }).filter(t=>t.amt>0);
 
-    const todayStr = today();
-    const singleSchedule = scheduleSingleTasks(singles);
-    const singleTargetsRaw = singleSchedule
-      .filter(s => s.assignedDay===todayStr || s.it.due<todayStr)
-      .map(s => ({it:s.it, title:s.it.title, unit:s.it.unit||'reading', amt:1, tight:s.tight || s.it.due<todayStr}));
+    // ---- Required today: split into two clearly labeled tiers ----
+    // Tight (red): due today or overdue — zero slack left, no framing needed beyond that.
+    // Pace (green): multi-part items with no slack in the days-remaining sense, but
+    // whose actual due date is later — grouped under a "keep pace" sub-heading so
+    // it's obvious why they're required despite not being due today.
+    const requiredTight = multiTargets.filter(t=>t.noSlack && t.tight)
+      .concat(singles.filter(it=>Math.max(daysBetween(today(), it.due),0)+1<=1)
+        .map(it=>({it, title:it.title, unit:it.unit||'reading', amt:1, tight:true})))
+      .sort((a,b)=> a.it.due.localeCompare(b.it.due));
+    const requiredPace = multiTargets.filter(t=>t.noSlack && !t.tight)
+      .sort((a,b)=> a.it.due.localeCompare(b.it.due));
 
-    const singleTargets = singleTargetsRaw;
-
-    const targets = multiTargets.concat(singleTargets);
-    const singleScheduleMap = new Map(singleSchedule.map(s=>[s.it, s.assignedDay]));
-
-    const requiredTargets = multiTargets.concat(singleTargets.filter(t=>t.tight));
-    const optionalTargets = singleTargets.filter(t=>!t.tight);
+    // ---- Optional today: bucket every credit-eligible item by its due date ----
+    // One header per due date, covering every item under it — no more mixing items
+    // from different due dates under a single ambiguous header, and no more
+    // per-row "due X" clutter since the bucket header already says it.
+    const optionalByDue = new Map();
+    function addOptional(due, entry){
+      if(!optionalByDue.has(due)) optionalByDue.set(due, []);
+      optionalByDue.get(due).push(entry);
+    }
+    multiTargets.filter(t=>!t.noSlack).forEach(t=>{
+      addOptional(t.it.due, {kind:'multi', it:t.it, title:t.title, unit:t.unit, amt:t.amt});
+    });
+    singles.forEach(it=>{
+      const daysUntilDue = Math.max(daysBetween(today(), it.due),0)+1;
+      if(daysUntilDue>1) addOptional(it.due, {kind:'single', it, title:it.title, unit:it.unit||'reading'});
+    });
+    const optionalBuckets = [...optionalByDue.entries()]
+      .sort((a,b)=> a[0].localeCompare(b[0]))
+      .map(([due, entries])=>{
+        const singleCount = entries.filter(e=>e.kind==='single').length;
+        // Days available to spread work across BEFORE the due date arrives
+        // (today, tomorrow, ...) — the due date itself isn't counted here since
+        // items due today already land in requiredTight, not this bucket.
+        const daysAvailable = Math.max(daysBetween(today(), due), 1);
+        // "Pick N of M" only makes sense when the whole bucket is all-or-nothing
+        // singles; a bucket containing a multi-part item can't be reduced that way.
+        // It's only a *required-today* pace item when there's no slack left —
+        // i.e. items left >= days available to spread them across.
+        const pickCount = (singleCount>1 && singleCount===entries.length && singleCount>=daysAvailable)
+          ? Math.ceil(singleCount/daysAvailable) : null;
+        return {due, entries, pickCount};
+      });
 
     const itemIndexMap = new Map(items.map((it,idx)=>[it, idx]));
 
-    function todayRowHtml(t, optional){
-      const dotClass = optional ? 'pl-today-dot-optional' : (t.tight ? 'pl-today-dot-tight' : '');
+    function requiredRowHtml(t, subheadClass){
+      const dotClass = t.tight ? 'pl-today-dot-tight' : '';
       const idx = itemIndexMap.get(t.it);
       const idxAttr = idx!==undefined ? ` data-item-i="${idx}"` : '';
-      return `<div class="pl-today-row pl-today-clickable ${optional?'pl-today-optional':''}"${idxAttr}>
-        <span class="pl-today-title"><span class="pl-today-dot ${dotClass}"></span><span>${t.title}</span>${t.tight?' <span class="pl-tight-flag" title="No slack left \u2014 falling behind pushes this past its due date">\u26a0</span>':''}</span>
-        <span class="pl-today-amt">${fmt(t.amt)} ${t.unit}</span>
+      const dueHint = subheadClass ? ` <span class="pl-today-due-hint">\u00b7 due ${relativeDueLabel(t.it.due)}</span>` : '';
+      // Single-part assignments are binary (do it or don't) \u2014 an amount
+      // badge like "1 reading" adds nothing, so only multi-part items get one.
+      const amtBadge = `<span class="pl-today-amt">${t.it.total>1 ? fmt(t.amt)+' '+unitLabel(t.amt,t.unit) : capUnit(t.unit)}</span>`;
+      return `<div class="pl-today-row pl-today-clickable"${idxAttr}>
+        <span class="pl-today-title"><span class="pl-today-dot ${dotClass}"></span><span>${t.title}</span>${dueHint}${t.tight?' <span class="pl-tight-flag" title="No slack left \u2014 falling behind pushes this past its due date">\u26a0</span>':''}</span>
+        ${amtBadge}
       </div>`;
     }
 
-    html = `<div class="pl-today"><b>Today's Targets</b>` +
-      (requiredTargets.length? requiredTargets.map(t=>todayRowHtml(t,false)).join('')
-        : (optionalTargets.length? '' : '<div class="pl-today-row"><span>Nothing due today \u2014 you\'re caught up.</span></div>')) +
-      (optionalTargets.length? `<div class="pl-today-divider"><span>pick one of these</span></div>` +
-        optionalTargets.map(t=>todayRowHtml(t,true)).join('')
-        : '') +
-      `</div>` + html;
+    function optionalBucketHtml(bucket){
+      const headerText = bucket.pickCount
+        ? `Due ${relativeDueLabel(bucket.due)} \u2014 do ${bucket.pickCount} of these ${bucket.entries.length}`
+        : `Due ${relativeDueLabel(bucket.due)}`;
+      // Pick buckets have no slack left, so they're required (green), not
+      // optional (dashed grey) \u2014 same meaning as the compact view.
+      const dotClass = bucket.pickCount ? '' : 'pl-today-dot-optional';
+      const rowClass = bucket.pickCount ? 'pl-today-clickable' : 'pl-today-clickable pl-today-optional';
+      const rows = bucket.entries.map(e=>{
+        const idx = itemIndexMap.get(e.it);
+        const idxAttr = idx!==undefined ? ` data-item-i="${idx}"` : '';
+        const amtBadge = `<span class="pl-today-amt">${e.kind==='multi' ? fmt(e.amt)+' '+unitLabel(e.amt,e.unit) : capUnit(e.unit)}</span>`;
+        return `<div class="pl-today-row ${rowClass}"${idxAttr}>
+          <span class="pl-today-title"><span class="pl-today-dot ${dotClass}"></span><span>${e.title}</span></span>
+          ${amtBadge}
+        </div>`;
+      }).join('');
+      return `<div class="pl-today-group-header">${headerText}</div>` + rows;
+    }
+
+    // A pick-count bucket ("do 1 of these 2") still represents real work needed
+    // today to keep pace, even though which item satisfies it is a free choice —
+    // so the condensed view surfaces it as one summary line, without spelling out
+    // every option (that detail lives in the expanded view).
+    function compactPickBucketHtml(bucket){
+      const headerText = `Due ${relativeDueLabel(bucket.due)} \u2014 do ${bucket.pickCount} of these ${bucket.entries.length}`;
+      const rows = bucket.entries.map(e=>{
+        const idx = itemIndexMap.get(e.it);
+        const idxAttr = idx!==undefined ? ` data-item-i="${idx}"` : '';
+        return `<div class="pl-today-row pl-today-clickable"${idxAttr}>
+          <span class="pl-today-title"><span class="pl-today-dot"></span><span>${e.title}</span></span>
+          <span class="pl-today-amt">${capUnit(e.unit)}</span>
+        </div>`;
+      }).join('');
+      return `<div class="pl-today-group-header">${headerText}</div>` + rows;
+    }
+
+    const hasRequired = requiredTight.length || requiredPace.length;
+    const pickBuckets = optionalBuckets.filter(b=>b.pickCount);
+    const requiredRowsHtml = requiredTight.map(t=>requiredRowHtml(t,false)).join('') + requiredPace.map(t=>requiredRowHtml(t,true)).join('');
+
+    const compactHasAnything = hasRequired || pickBuckets.length;
+    const compactBody = compactHasAnything
+      ? requiredRowsHtml + pickBuckets.map(b=>compactPickBucketHtml(b)).join('')
+      : '<div class="pl-today-row"><span>You\'re all set for today.</span></div>';
+
+    const expandedBody = (hasRequired
+        ? requiredRowsHtml
+        : (optionalBuckets.length
+            ? '<div class="pl-today-row"><span>You\'re all set for today \u2014 but here\'s what you can do to get ahead:</span></div>'
+            : '<div class="pl-today-row"><span>Nothing due today \u2014 you\'re caught up.</span></div>')) +
+      optionalBuckets.map(b=>optionalBucketHtml(b)).join('');
+
+    html = `<div class="pl-today" id="pl-today-card">
+      <div class="pl-today-header-row">
+        <b>Today's Targets</b>
+        <button type="button" id="pl-today-toggle" class="pl-today-toggle-btn" aria-expanded="${todayExpanded}" aria-label="${todayExpanded? 'Show less' : 'Show all'}"><span class="pl-today-arrow${todayExpanded?' pl-today-arrow-open':''}">\u203a</span></button>
+      </div>
+      <div class="pl-today-body-anim">` +
+      (todayExpanded? expandedBody : compactBody) +
+      `</div></div>` + html;
 
     if(list.length===0){
       const filtersActive = !!(searchTerm || hideDone || overdueFilterActive);
@@ -881,17 +1056,24 @@ if ('serviceWorker' in navigator) {
       const daysLeft = daysBetween(today(), it.due);
       const overdue = !it.completed && !locked && daysLeft<0;
       const effDays = Math.max(daysLeft,1);
-      const target = (left>0 && !it.completed && !overdue) ? Math.ceil(left/effDays) : 0;
+      const dt = it.dailyTarget;
+      const progressToday = dt ? Math.max(it.done - dt.startDone, 0) : 0;
+      const remainingToday = dt ? Math.max(dt.amt - progressToday, 0) : 0;
+      const metToday = !!(dt && dt.amt>0 && remainingToday<=0);
+      const tomorrowDaysLeft = Math.max(daysBetween(addDays(today(),1), it.due), 1);
+      const tomorrowTarget = left>0 ? Math.ceil(left/tomorrowDaysLeft) : 0;
       const pct = Math.min(100, Math.round((it.done/it.total)*100));
       const unit = it.unit || 'units';
       const cardCourseColor = it.course ? courseColor(it.course) : null;
       const cls = locked ? 'pl-locked' : urgencyClass(daysLeft, it.completed);
       const statusText = it.completed ? 'Completed'
         : locked ? `<span class="pl-waiting">Waiting on: ${it.dependsOn}</span>`
-        : overdue ? `<span class="pl-overdue-text">Overdue by ${Math.abs(daysLeft)}d</span>`
+        : overdue ? `<span class="pl-overdue-text">Overdue by ${Math.abs(daysLeft)} day${Math.abs(daysLeft)===1?'':'s'}</span>`
         : (it.total<=1)
-          ? (left<=0 ? 'Done' : (singleScheduleMap.get(it)===today() ? 'Do today' : 'Scheduled for '+relativeDueLabel(singleScheduleMap.get(it))))
-          : (left>0? target+' '+unit+'/day':'Done');
+          ? (left<=0 ? 'Done' : 'Available')
+          : (left<=0 ? 'Done'
+             : metToday ? tomorrowTarget+' '+unitLabel(tomorrowTarget,unit)+' tomorrow'
+             : remainingToday+' '+unitLabel(remainingToday,unit)+'/day');
       html += `<div class="pl-card ${it.completed?'pl-done':''} ${cls}" id="pl-card-${i}" data-i="${i}">
         <div class="pl-card-head">
           ${sortMode==='custom'? `<span class="pl-drag-handle" draggable="true" data-i="${i}" title="Drag to reorder" aria-hidden="true">\u2837</span>` : ''}
@@ -906,7 +1088,7 @@ if ('serviceWorker' in navigator) {
         <div class="pl-row"><span title="${it.due}">Due ${relativeDueLabel(it.due)}</span><span>${statusText}</span></div>
         <div class="pl-bar"><div class="pl-fill" data-fill-key="${i}" style="width:${pct}%"></div></div>
         <div class="pl-row pl-actions-row">
-          <span>${fmt(it.done)}/${fmt(it.total)} ${unit}</span>
+          <span>${it.total>1 ? fmt(it.done)+'/'+fmt(it.total)+' '+unit : capUnit(unit)}</span>
           <span class="pl-actions">
             ${sortMode==='custom'? `<button data-pos="${pos}" class="pl-move-up pl-secondary" aria-label="Move up" ${pos===0?'disabled':''}>\u2191</button><button data-pos="${pos}" class="pl-move-down pl-secondary" aria-label="Move down" ${pos===list.length-1?'disabled':''}>\u2193</button>` : ''}
             ${(!it.completed && !locked && it.total>1)? `<button data-i="${i}" class="pl-log">+1</button>` : ''}
@@ -990,6 +1172,9 @@ if ('serviceWorker' in navigator) {
     root.querySelectorAll('.pl-card[id^="pl-card-"]').forEach(el=>{
       prevCardOpacity[el.id] = getComputedStyle(el).opacity;
     });
+    const prevTodayBodyEl = root.querySelector('.pl-today-body-anim');
+    const prevTodayBodyHeight = (pendingTodayAnim && prevTodayBodyEl) ? prevTodayBodyEl.getBoundingClientRect().height : null;
+    const prevTodayBodyHTML = (pendingTodayAnim && prevTodayBodyEl) ? prevTodayBodyEl.innerHTML : null;
 
     root.innerHTML = html;
 
@@ -1003,7 +1188,8 @@ if ('serviceWorker' in navigator) {
       }
     });
 
-    if(!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)){
+    const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if(!reducedMotion){
       root.querySelectorAll('.pl-card[id^="pl-card-"]').forEach(el=>{
         const prev = prevCardOpacity[el.id];
         if(prev === undefined) return;
@@ -1015,6 +1201,47 @@ if ('serviceWorker' in navigator) {
         }
       });
     }
+    if(prevTodayBodyHeight!==null && !reducedMotion){
+      const newBodyEl = root.querySelector('.pl-today-body-anim');
+      if(newBodyEl){
+        const newHeight = newBodyEl.getBoundingClientRect().height;
+
+        // Lay the old content on top as an overlay so it fades out in place,
+        // instead of vanishing the instant the new content replaces it.
+        const overlay = document.createElement('div');
+        overlay.className = 'pl-today-body-overlay';
+        overlay.innerHTML = prevTodayBodyHTML;
+        overlay.style.opacity = '1';
+
+        // New content starts invisible and fades in as the overlay fades out.
+        const newInner = document.createElement('div');
+        while(newBodyEl.firstChild) newInner.appendChild(newBodyEl.firstChild);
+        newInner.style.opacity = '0';
+        newInner.style.transition = 'opacity 0.3s ease';
+        newBodyEl.appendChild(newInner);
+        newBodyEl.appendChild(overlay);
+
+        newBodyEl.style.height = prevTodayBodyHeight+'px';
+        void newBodyEl.offsetWidth;
+        newBodyEl.style.transition = 'height 0.3s ease';
+        requestAnimationFrame(()=>{
+          newBodyEl.style.height = newHeight+'px';
+          overlay.style.opacity = '0';
+          newInner.style.opacity = '1';
+        });
+        newBodyEl.addEventListener('transitionend', function handler(e){
+          if(e.propertyName!=='height') return;
+          newBodyEl.style.height = '';
+          newBodyEl.style.transition = '';
+          // Unwrap: move newInner's children back up, drop the wrapper + overlay.
+          while(newInner.firstChild) newBodyEl.appendChild(newInner.firstChild);
+          newInner.remove();
+          overlay.remove();
+          newBodyEl.removeEventListener('transitionend', handler);
+        });
+      }
+    }
+    pendingTodayAnim = false;
 
     const addToggle = document.getElementById('pl-add-toggle');
     if(addToggle) addToggle.onclick = ()=>{ showForm = true; pendingFocus = 'title'; render(); };
@@ -1050,13 +1277,24 @@ if ('serviceWorker' in navigator) {
         const title = document.getElementById('pl-title').value.trim();
         const course = document.getElementById('pl-course').value.trim();
         const due = document.getElementById('pl-due').value;
-        const total = parseFloat(document.getElementById('pl-units').value);
+        const unitsRaw = document.getElementById('pl-units').value.trim();
+        const total = unitsRaw ? parseFloat(unitsRaw) : 1;
         const unit = document.getElementById('pl-unitlabel').value.trim() || 'units';
         const notes = document.getElementById('pl-notes').value.trim();
         const dependsOn = document.getElementById('pl-depends').value;
         const recurring = document.getElementById('pl-recurring').value;
         const subtaskLines = document.getElementById('pl-subtasks').value.split('\n').map(s=>s.trim()).filter(Boolean);
-        if(!title||!due||!total) return alert('Fill in title, due date, and total amount');
+        const titleEl = document.getElementById('pl-title');
+        const dueEl = document.getElementById('pl-due');
+        [titleEl,dueEl].forEach(el=>el.classList.remove('pl-field-error'));
+        const missing = [];
+        if(!title) missing.push(titleEl);
+        if(!due) missing.push(dueEl);
+        if(missing.length){
+          missing.forEach(el=>el.classList.add('pl-field-error'));
+          missing[0].focus();
+          return;
+        }
         const prevSubtasks = (editIndex!==null && items[editIndex].subtasks) || [];
         const subtasks = subtaskLines.map(text=>{
           const prev = prevSubtasks.find(s=>s.text===text);
@@ -1092,6 +1330,23 @@ if ('serviceWorker' in navigator) {
     }
 
     document.getElementById('pl-sort').onchange = (e)=>{ sortMode=e.target.value; savePrefs(); render(); };
+    const todayToggleBtn = document.getElementById('pl-today-toggle');
+    if(todayToggleBtn) todayToggleBtn.onclick = ()=>{
+      todayExpanded = !todayExpanded;
+      pendingTodayAnim = true;
+      savePrefs();
+      render();
+    };
+    const todayCard = document.getElementById('pl-today-card');
+    if(todayCard) todayCard.addEventListener('click', (e)=>{
+      // Ignore clicks on the toggle button or on rows that have their own
+      // click behavior (scroll-to-card) — only empty space toggles.
+      if(e.target.closest('#pl-today-toggle') || e.target.closest('.pl-today-clickable')) return;
+      todayExpanded = !todayExpanded;
+      pendingTodayAnim = true;
+      savePrefs();
+      render();
+    });
     document.getElementById('pl-show-completed').onchange = (e)=>{ hideDone = !e.target.checked; savePrefs(); render(); };
     document.getElementById('pl-show-archived').onchange = (e)=>{ showArchived = e.target.checked; savePrefs(); render(); };
     document.getElementById('pl-filter').oninput = (e)=>{
