@@ -90,6 +90,10 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
 }
 #pl-app .pl-week-block{background:var(--pl-card-bg);border-radius:10px;padding:10px 12px 12px;margin-bottom:14px;}
 #pl-app .pl-summary{font-size:12.5px;color:var(--pl-muted);margin-bottom:8px;}
+#pl-app .pl-streak-banner{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;padding:10px 12px;border-radius:10px;background:var(--pl-card-bg);color:var(--pl-fg);}
+#pl-app .pl-streak-banner-text{flex:1;min-width:0;font-size:12.5px;line-height:1.4;color:var(--pl-fg);}
+#pl-app .pl-streak-dismiss{background:none;border:none;color:var(--pl-muted);font-size:18px;line-height:1;padding:2px 6px;margin:0;cursor:pointer;border-radius:6px;}
+#pl-app .pl-streak-dismiss:hover{background:rgba(255,255,255,0.04);color:var(--pl-fg);}
 #pl-app .pl-week{display:flex;gap:6px;align-items:flex-end;}
 #pl-app .pl-week-col{flex:1;display:flex;flex-direction:column;align-items:center;font-size:10px;color:var(--pl-muted);}
 #pl-app .pl-week-bar{width:100%;background:var(--pl-bar-bg);border-radius:4px 4px 0 0;display:flex;align-items:flex-start;justify-content:center;color:#fff;font-size:10px;min-height:4px;}
@@ -235,6 +239,8 @@ body, #pl-app .pl-today, #pl-app .pl-week-block, #pl-modal-box, #pl-app input, #
 #pl-app .pl-course-row{display:flex;gap:8px;align-items:center;margin-bottom:6px;}
 #pl-app .pl-course-row input[type="text"]{flex:1;margin-bottom:0;}
 #pl-app .pl-course-row input[type="color"]{width:40px;padding:0;height:32px;margin-bottom:0;}
+#pl-dev-toolbar-btn{position:fixed;bottom:92px;right:20px;z-index:9999;padding:10px 14px;border-radius:8px;background:#1e1e1e;color:#fff;border:1px solid #444;box-shadow:0 4px 12px rgba(0,0,0,0.3);font-weight:700;cursor:pointer;}
+#pl-dev-toolbar-panel{display:none;position:fixed;bottom:146px;right:20px;z-index:9998;background:#1e1e1e;color:#fff;border:1px solid #333;padding:15px;border-radius:8px;width:260px;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,0.5);}#pl-dev-toolbar-panel h4{margin:0 0 10px 0;color:#4da6ff;font-size:14px;}#pl-dev-toolbar-panel button{width:100%;margin:0 0 8px;padding:8px;background:#333;color:#fff;border:1px solid #555;border-radius:4px;cursor:pointer;text-align:left;}#pl-dev-toolbar-panel button:hover{background:#444;}
 #pl-modal-backdrop{position:fixed;top:0;left:0;right:0;bottom:0;background:var(--pl-backdrop);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;box-sizing:border-box;animation:pl-fade-in 0.18s ease-out;}
 #pl-modal-box{background:var(--pl-modal-bg);color:var(--pl-fg);border-radius:12px;padding:20px;max-width:420px;width:100%;max-height:90vh;overflow-y:auto;position:relative;box-shadow:0 10px 40px var(--pl-modal-shadow);animation:pl-modal-pop 0.22s cubic-bezier(.22,.9,.32,1.2);}
 @keyframes pl-fade-in{ from{ opacity:0; } to{ opacity:1; } }
@@ -285,11 +291,15 @@ if ('serviceWorker' in navigator) {
   const KEY='pl-assignments';
   const PREFS_KEY='pl-prefs';
   const COURSE_COLORS_KEY='pl-course-colors';
-  const COMPLETION_LOG_KEY='pl-completion-log';
   const DAY_COMPLETE_LOG_KEY='pl-day-complete-log';
+  const DEV_MODE_KEY='pl-dev-mode';
+  const DEV_PANEL_KEY='pl-dev-panel-open';
+  const DAY_OFFSET_KEY='pl-day-offset';
   const ARCHIVE_AFTER_DAYS=14;
 
   let items = JSON.parse(localStorage.getItem(KEY) || '[]');
+  let devMode = localStorage.getItem(DEV_MODE_KEY) === '1';
+  let devPanelOpen = localStorage.getItem(DEV_PANEL_KEY) === '1';
   let editIndex = null;
   let showForm = false;
   let showCourseManager = false;
@@ -302,8 +312,7 @@ if ('serviceWorker' in navigator) {
   let pendingTodayAnim = false;
   let overdueFilterActive = false;
   let dragSrcIndex = null;
-  let prevAllRequiredDone = null;
-  let pendingBigConfetti = false;
+  let celebrationPending = null;
 
   let prefs = {};
   try{ prefs = JSON.parse(localStorage.getItem(PREFS_KEY)) || {}; }catch(e){ prefs = {}; }
@@ -318,9 +327,6 @@ if ('serviceWorker' in navigator) {
   try{ courseColors = JSON.parse(localStorage.getItem(COURSE_COLORS_KEY)) || {}; }catch(e){ courseColors = {}; }
   function saveCourseColors(){ localStorage.setItem(COURSE_COLORS_KEY, JSON.stringify(courseColors)); }
 
-  let completionLog = [];
-  try{ completionLog = JSON.parse(localStorage.getItem(COMPLETION_LOG_KEY)) || []; }catch(e){ completionLog = []; }
-  function saveCompletionLog(){ localStorage.setItem(COMPLETION_LOG_KEY, JSON.stringify(completionLog)); }
   // Logged only on days where nothing required is left \u2014 not just "did
   // something" \u2014 so the streak reflects actually staying caught up.
   let dayCompleteLog = [];
@@ -328,7 +334,11 @@ if ('serviceWorker' in navigator) {
   function saveDayCompleteLog(){ localStorage.setItem(DAY_COMPLETE_LOG_KEY, JSON.stringify(dayCompleteLog)); }
   function logDayComplete(){
     const t = today();
-    if(!dayCompleteLog.includes(t)){ dayCompleteLog.push(t); saveDayCompleteLog(); }
+    const daySet = new Set(dayCompleteLog);
+    if(!daySet.has(t)){
+      dayCompleteLog.push(t);
+      saveDayCompleteLog();
+    }
   }
 
   function savePrefs(){
@@ -496,19 +506,30 @@ if ('serviceWorker' in navigator) {
       anim.onfinish = () => el.remove();
     }
   }
-  // Bigger celebration for clearing everything required today: fires from
-  // three points across the top of the screen instead of one spot, so it
-  // reads as a clearly bigger moment than finishing a single item.
-  function burstBigConfetti(){
-    const y = Math.min(160, window.innerHeight*0.25);
-    [0.2, 0.5, 0.8].forEach(f=> burstConfetti(window.innerWidth*f, y, {big:true}));
-  }
-
   function save(){ localStorage.setItem(KEY, JSON.stringify(items)); render(); }
-  function today(){ const d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
-  function daysBetween(a,b){ return Math.round((new Date(b)-new Date(a))/86400000); }
-  function addDays(dateStr, n){ const d=new Date(dateStr+'T00:00:00'); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
-  function addMonths(dateStr, n){ const d=new Date(dateStr+'T00:00:00'); d.setMonth(d.getMonth()+n); return d.toISOString().slice(0,10); }
+  function triggerCelebration(x, y, big){ celebrationPending = {x, y, big: !!big}; }
+  function saveDevMode(){ localStorage.setItem(DEV_MODE_KEY, devMode ? '1' : '0'); }
+  function saveDevPanelOpen(){ localStorage.setItem(DEV_PANEL_KEY, devPanelOpen ? '1' : '0'); }
+  function isDevModeTrigger(title, total){
+    return String(title || '').trim().toLowerCase() === 'dev mode' && Number(total) === 101;
+  }
+  function activateDevMode(){
+    if(devMode) return;
+    devMode = true;
+    saveDevMode();
+    showToast('Dev mode enabled');
+  }
+  function asDate(dateStr){ return new Date(dateStr + 'T00:00:00'); }
+  function today(){
+    const d = new Date();
+    const offset = Number(localStorage.getItem(DAY_OFFSET_KEY) || 0);
+    if(Number.isFinite(offset)) d.setDate(d.getDate() + offset);
+    d.setHours(0,0,0,0);
+    return d.toISOString().slice(0,10);
+  }
+  function daysBetween(a, b){ return Math.round((asDate(b) - asDate(a)) / 86400000); }
+  function addDays(dateStr, n){ const d = asDate(dateStr); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+  function addMonths(dateStr, n){ const d = asDate(dateStr); d.setMonth(d.getMonth()+n); return d.toISOString().slice(0,10); }
   function nextDueDate(due, recurring){
     if(recurring==='weekly') return addDays(due,7);
     if(recurring==='monthly') return addMonths(due,1);
@@ -519,9 +540,9 @@ if ('serviceWorker' in navigator) {
     if(d===0) return 'Today';
     if(d===1) return 'Tomorrow';
     if(d===-1) return 'Yesterday';
-    if(d>=2 && d<=6) return new Date(dateStr+'T00:00:00').toLocaleDateString(undefined,{weekday:'long'});
+    if(d>=2 && d<=6) return asDate(dateStr).toLocaleDateString(undefined,{weekday:'long'});
     if(d<=-2 && d>=-6) return Math.abs(d)+'d ago';
-    return new Date(dateStr+'T00:00:00').toLocaleDateString(undefined,{month:'short', day:'numeric'});
+    return asDate(dateStr).toLocaleDateString(undefined,{month:'short', day:'numeric'});
   }
   function urgencyClass(daysLeft, completed){
     if(completed) return '';
@@ -574,38 +595,17 @@ if ('serviceWorker' in navigator) {
     save();
   }
 
-  // Assigns each all-or-nothing task (total<=1) to the least-loaded day between
-  // today and its due date, processing tasks in deadline order (earliest-deadline-first).
-  // This spreads work evenly across the days available instead of dumping everything
-  // on the due date, while guaranteeing every task lands on or before its deadline
-  // whenever that's mathematically possible. If a task can't be placed without stacking
-  // it onto its own due date because every earlier day is already as loaded, it's
-  // flagged as tight so the UI can call it out.
-  function scheduleSingleTasks(taskItems){
-    const t0 = today();
-    const sorted = [...taskItems].sort((a,b)=> a.due.localeCompare(b.due));
-    const dayLoad = {};
-    return sorted.map(it=>{
-      const deadline = it.due < t0 ? t0 : it.due;
-      let d = t0, bestDay = t0, bestLoad = Infinity;
-      while(true){
-        const load = dayLoad[d] || 0;
-        if(load < bestLoad){ bestLoad = load; bestDay = d; }
-        if(d >= deadline) break;
-        d = addDays(d,1);
-      }
-      dayLoad[bestDay] = (dayLoad[bestDay]||0) + 1;
-      return { it, assignedDay: bestDay, tight: bestDay===deadline && bestLoad>0 };
-    });
-  }
-
-  function logCompletionToday(){
-    const t = today();
-    if(!completionLog.includes(t)){ completionLog.push(t); saveCompletionLog(); }
-  }
   function currentStreak(){
-    let streak=0, d=today();
-    while(dayCompleteLog.includes(d)){ streak++; d=addDays(d,-1); }
+    const daySet = new Set(dayCompleteLog);
+    let streak = 0;
+    let d = today();
+    if (!daySet.has(d)) {
+      d = addDays(d, -1);
+    }
+    while (daySet.has(d)) {
+      streak++;
+      d = addDays(d, -1);
+    }
     return streak;
   }
   function completedThisWeek(){
@@ -643,18 +643,22 @@ if ('serviceWorker' in navigator) {
     if(!('Notification' in window)) return;
     if(Notification.permission !== 'granted') return;
     const log = getNotifyLog();
+    const logSet = new Set(log);
     const t = today();
     const tmrw = addDays(t,1);
     const dueSoon = items.filter(it=>!it.completed && !it.archived && !isLocked(it) && (it.due===t || it.due===tmrw));
     dueSoon.forEach(it=>{
       const key = t+'|'+it.title;
-      if(!log.includes(key)){
+      if(!logSet.has(key)){
         const when = it.due===t ? 'today' : 'tomorrow';
-        new Notification('Due '+when+': '+it.title, {
-          body: (it.course? it.course+' \u2014 ':'') + 'Due '+it.due,
+        const title = it.due===t ? `✨ ${it.title} is due today` : `⏰ ${it.title} is due tomorrow`;
+        const body = (it.course ? it.course + ' • ' : '') + (it.due===t ? 'Time to get this one moving ✨' : 'This one is coming up soon 🌟');
+        new Notification(title, {
+          body,
           icon: 'icons/icon-192.png'
         });
         log.push(key);
+        logSet.add(key);
       }
     });
     const cutoff = addDays(t,-3);
@@ -672,7 +676,7 @@ if ('serviceWorker' in navigator) {
       total: it.total, unit: it.unit, notes: it.notes, done: 0, completed: false,
       dependsOn: '', recurring: it.recurring,
       subtasks: (it.subtasks||[]).map(s=>({text:s.text, done:false})),
-      completedAt: null, archived: false, order: maxOrder+1
+      completedAt: null, createdAt: today(), archived: false, order: maxOrder+1
     };
   }
 
@@ -684,15 +688,20 @@ if ('serviceWorker' in navigator) {
       toast.id = 'pl-toast';
       document.body.appendChild(toast);
     }
-    toast.innerHTML = `<span>${message}</span><button id="pl-toast-undo">Undo</button>`;
+    const hasUndo = typeof onUndo === 'function';
+    toast.innerHTML = hasUndo
+      ? `<span>${message}</span><button id="pl-toast-undo">Undo</button>`
+      : `<span>${message}</span>`;
     toast.style.display = 'flex';
     toast.classList.remove('pl-toast-anim');
     void toast.offsetWidth;
     toast.classList.add('pl-toast-anim');
-    document.getElementById('pl-toast-undo').onclick = ()=>{
-      if(onUndo) onUndo();
-      hideToast();
-    };
+    if(hasUndo){
+      document.getElementById('pl-toast-undo').onclick = ()=>{
+        onUndo();
+        hideToast();
+      };
+    }
     clearTimeout(toastTimeout);
     toastTimeout = setTimeout(hideToast, 6000);
   }
@@ -841,6 +850,25 @@ if ('serviceWorker' in navigator) {
     </div>`;
   }
 
+  function getDailyStreakNotice(){
+    const todayKey = today();
+    const seen = localStorage.getItem('pl-streak-banner-seen-date');
+    const dismissed = localStorage.getItem('pl-streak-banner-dismissed-date');
+    if(seen === todayKey || dismissed === todayKey) return null;
+
+    const streak = currentStreak();
+    return {
+      message: streak > 0
+        ? `Your ${streak}-day streak is still active. Keep the momentum going today.`
+        : 'Your streak ended today. Reset your focus and build it back tomorrow.'
+    };
+  }
+
+  function dismissDailyStreakNotice(){
+    localStorage.setItem('pl-streak-banner-dismissed-date', today());
+    localStorage.setItem('pl-streak-banner-seen-date', today());
+  }
+
   function render(){
     currentColorMap = computeCourseColorMap();
 
@@ -869,9 +897,18 @@ if ('serviceWorker' in navigator) {
     const totalCompleted = items.filter(i=>i.completed).length;
     const thisWeek = completedThisWeek();
     const streak = currentStreak();
-    const summaryText = `${totalActive} active \u00b7 ${totalCompleted} completed \u00b7 ${thisWeek} this week${streak>0? ' \u00b7 '+streak+'-day streak':''}`;
+    const streakText = streak > 0 ? `${streak}-day streak 🔥` : `0-day streak 🔥`;
+    const summaryText = `${totalActive} active \u00b7 ${totalCompleted} completed${streak>0? ' \u00b7 '+streakText : ' \u00b7 '+streakText}`;
 
     html += weekChartHtml(summaryText, !pendingTodayAnim);
+
+    const streakNotice = getDailyStreakNotice();
+    if(streakNotice){
+      html += `<div class="pl-streak-banner" id="pl-streak-banner">
+        <div class="pl-streak-banner-text">${streakNotice.message}</div>
+        <button type="button" class="pl-streak-dismiss" id="pl-streak-dismiss" aria-label="Dismiss daily streak notice">×</button>
+      </div>`;
+    }
 
     let list = items.map((it,i)=>({it,i}));
     if(!showArchived) list = list.filter(x=>!x.it.archived);
@@ -954,7 +991,7 @@ if ('serviceWorker' in navigator) {
     // whose actual due date is later — grouped under a "keep pace" sub-heading so
     // it's obvious why they're required despite not being due today.
     const requiredTight = multiTargets.filter(t=>t.noSlack && t.tight)
-      .concat(singles.filter(it=>Math.max(daysBetween(today(), it.due),0)+1<=1)
+      .concat(singles.filter(it=>daysBetween(today(), it.due)<=0)
         .map(it=>({it, title:it.title, unit:it.unit||'reading', amt:1, tight:true})))
       .sort((a,b)=> a.it.due.localeCompare(b.it.due));
     const requiredPace = multiTargets.filter(t=>t.noSlack && !t.tight)
@@ -969,12 +1006,17 @@ if ('serviceWorker' in navigator) {
       if(!optionalByDue.has(due)) optionalByDue.set(due, []);
       optionalByDue.get(due).push(entry);
     }
+    // Build a set of items already required (tight or pace) so optionals don't duplicate them
+    const requiredItemsSet = new Set([...requiredTight.map(t=>t.it), ...requiredPace.map(t=>t.it)]);
+    
     multiTargets.filter(t=>!t.noSlack).forEach(t=>{
       addOptional(t.it.due, {kind:'multi', it:t.it, title:t.title, unit:t.unit, amt:t.amt});
     });
     singles.forEach(it=>{
-      const daysUntilDue = Math.max(daysBetween(today(), it.due),0)+1;
-      if(daysUntilDue>1) addOptional(it.due, {kind:'single', it, title:it.title, unit:it.unit||'reading'});
+      if(!requiredItemsSet.has(it)){
+        const d = daysBetween(today(), it.due);
+        if(d>=0) addOptional(it.due, {kind:'single', it, title:it.title, unit:it.unit||'reading'});
+      }
     });
     const optionalBuckets = [...optionalByDue.entries()]
       .sort((a,b)=> a[0].localeCompare(b[0]))
@@ -1045,13 +1087,31 @@ if ('serviceWorker' in navigator) {
       }).join('');
       return `<div class="pl-today-group-header">${headerText}</div>` + rows;
     }
+    function compactOptionalBucketHtml(bucket){
+      const headerText = `Later \u2014 due ${relativeDueLabel(bucket.due)}`;
+      const rows = bucket.entries.slice(0, 2).map(e=>{
+        const idx = itemIndexMap.get(e.it);
+        const idxAttr = idx!==undefined ? ` data-item-i="${idx}"` : '';
+        return `<div class="pl-today-row pl-today-clickable pl-today-optional"${idxAttr}>
+          <span class="pl-today-title"><span class="pl-today-dot pl-today-dot-optional"></span><span>${e.title}</span></span>
+          <span class="pl-today-amt">${capUnit(e.unit)}</span>
+        </div>`;
+      }).join('');
+      const more = bucket.entries.length > 2 ? `<div class="pl-today-row pl-today-optional"><span class="pl-today-title"><span class="pl-today-dot pl-today-dot-optional"></span><span>+${bucket.entries.length - 2} more</span></span></div>` : '';
+      return `<div class="pl-today-group-header">${headerText}</div>` + rows + more;
+    }
 
     const hasRequired = requiredTight.length || requiredPace.length;
     const pickBuckets = optionalBuckets.filter(b=>b.pickCount);
-    const allRequiredDoneToday = !hasRequired && pickBuckets.length===0;
+    const laterBuckets = optionalBuckets.filter(b=>!b.pickCount);
+    const requiredItemSet = new Set([
+      ...requiredTight.map(t => t.it),
+      ...requiredPace.map(t => t.it),
+      ...pickBuckets.flatMap(bucket => bucket.entries.map(e => e.it))
+    ]);
+    const hasPriorAssignmentWork = items.some(it => !it.completed && !it.archived && (it.createdAt ? it.createdAt < today() : it.due < today()));
+    const allRequiredDoneToday = !hasRequired && pickBuckets.length===0 && hasPriorAssignmentWork;
     if(allRequiredDoneToday) logDayComplete();
-    if(prevAllRequiredDone===false && allRequiredDoneToday) pendingBigConfetti = true;
-    prevAllRequiredDone = allRequiredDoneToday;
     const requiredRowsHtml = requiredTight.map(t=>requiredRowHtml(t,false)).join('') + requiredPace.map(t=>requiredRowHtml(t,true)).join('');
 
     const compactHasAnything = hasRequired || pickBuckets.length;
@@ -1103,11 +1163,13 @@ if ('serviceWorker' in navigator) {
       const statusText = it.completed ? 'Completed'
         : locked ? `<span class="pl-waiting">Waiting on: ${it.dependsOn}</span>`
         : overdue ? `<span class="pl-overdue-text">Overdue by ${Math.abs(daysLeft)} day${Math.abs(daysLeft)===1?'':'s'}</span>`
-        : (it.total<=1)
-          ? (left<=0 ? 'Done' : 'Available')
-          : (left<=0 ? 'Done'
-             : metToday ? tomorrowTarget+' '+unitLabel(tomorrowTarget,unit)+' tomorrow'
-             : remainingToday+' '+unitLabel(remainingToday,unit)+'/day');
+        : requiredItemSet.has(it)
+          ? (it.total<=1 ? `Due ${relativeDueLabel(it.due)}` : (metToday ? tomorrowTarget+' '+unitLabel(tomorrowTarget,unit)+' tomorrow' : remainingToday+' '+unitLabel(remainingToday,unit)+'/day'))
+          : (it.total<=1)
+            ? (left<=0 ? 'Done' : 'Available')
+            : (left<=0 ? 'Done'
+               : metToday ? tomorrowTarget+' '+unitLabel(tomorrowTarget,unit)+' tomorrow'
+               : remainingToday+' '+unitLabel(remainingToday,unit)+'/day');
       html += `<div class="pl-card ${it.completed?'pl-done':''} ${cls}" id="pl-card-${i}" data-i="${i}">
         <div class="pl-card-head">
           ${sortMode==='custom'? `<span class="pl-drag-handle" draggable="true" data-i="${i}" title="Drag to reorder" aria-hidden="true">\u2837</span>` : ''}
@@ -1171,6 +1233,17 @@ if ('serviceWorker' in navigator) {
       ) : ''}
     </div>`;
 
+    if(devMode){
+      html += `<button id="pl-dev-toolbar-btn" type="button">🛠️ Dev Menu</button>
+      <div id="pl-dev-toolbar-panel" style="display:${devPanelOpen ? 'block' : 'none'};">
+        <h4>Dev Testing Controls</h4>
+        <button type="button" id="pl-dev-trigger-notify">🔔 Trigger Test Notification</button>
+        <button type="button" id="pl-dev-advance-1">⏩ Advance Time +1 Day</button>
+        <button type="button" id="pl-dev-advance-7">⏩ Advance Time +7 Days</button>
+        <button type="button" id="pl-dev-reset">⚠️ Hard Reset Everything</button>
+      </div>`;
+    }
+
     if(showCourseManager){
       const courseNames = [...new Set(items.map(i=>(i.course||'').trim()).filter(Boolean))];
       html += `<div class="pl-course-manager" id="pl-course-manager">`;
@@ -1211,6 +1284,20 @@ if ('serviceWorker' in navigator) {
     const prevTodayBodyHTML = (pendingTodayAnim && prevTodayBodyEl) ? prevTodayBodyEl.innerHTML : null;
 
     root.innerHTML = html;
+
+    const streakDismissBtn = document.getElementById('pl-streak-dismiss');
+    if(streakDismissBtn){
+      streakDismissBtn.onclick = ()=>{
+        dismissDailyStreakNotice();
+        render();
+      };
+    }
+
+    if(celebrationPending){
+      const c = celebrationPending;
+      celebrationPending = null;
+      requestAnimationFrame(()=> burstConfetti(c.x, c.y, {big: c.big}));
+    }
 
     root.querySelectorAll('[data-fill-key]').forEach(el=>{
       const key = el.dataset.fillKey;
@@ -1339,10 +1426,12 @@ if ('serviceWorker' in navigator) {
           it.title=title; it.course=course; it.due=due; it.total=total; it.unit=unit; it.notes=notes;
           it.dependsOn=dependsOn; it.recurring=recurring; it.subtasks=subtasks;
           it.done = Math.min(it.done, total);
+          if(isDevModeTrigger(it.title, it.total)) activateDevMode();
           editIndex = null;
         } else {
           const maxOrder = items.reduce((m,x)=> Math.max(m, x.order ?? -1), -1);
-          items.push({title,course,due,total,unit,notes,done:0,completed:false,dependsOn,recurring,subtasks,completedAt:null,archived:false,order:maxOrder+1});
+          items.push({title,course,due,total,unit,notes,done:0,completed:false,dependsOn,recurring,subtasks,completedAt:null,createdAt:today(),archived:false,order:maxOrder+1});
+          if(isDevModeTrigger(title, total)) activateDevMode();
           pendingScrollId = 'pl-card-'+(items.length-1);
           pendingScrollAlign = 'top';
         }
@@ -1415,6 +1504,59 @@ if ('serviceWorker' in navigator) {
     };
     document.getElementById('pl-clear-completed').onclick = clearCompleted;
 
+    const devToolbarBtn = document.getElementById('pl-dev-toolbar-btn');
+    if(devToolbarBtn){
+      devToolbarBtn.onclick = ()=>{
+        devPanelOpen = !devPanelOpen;
+        saveDevPanelOpen();
+        render();
+      };
+    }
+    const devTriggerNotify = document.getElementById('pl-dev-trigger-notify');
+    if(devTriggerNotify){
+      devTriggerNotify.onclick = ()=>{
+        if (!('Notification' in window)) {
+          alert('This browser does not support desktop notifications.');
+          return;
+        }
+        Notification.requestPermission().then(permission => {
+          if (permission === 'granted') {
+            new Notification('🧪 Dev ping', { body: 'A little planner nudge just for testing ✨', icon: 'icons/icon-192.png' });
+          } else {
+            alert('Notification permission denied.');
+          }
+        });
+      };
+    }
+    const devAdvance1 = document.getElementById('pl-dev-advance-1');
+    if(devAdvance1){
+      devAdvance1.onclick = ()=>{
+        const offset = Number(localStorage.getItem(DAY_OFFSET_KEY) || 0);
+        localStorage.setItem(DAY_OFFSET_KEY, String(offset + 1));
+        alert('Simulated moving forward 1 day. Reloading...');
+        location.reload();
+      };
+    }
+    const devAdvance7 = document.getElementById('pl-dev-advance-7');
+    if(devAdvance7){
+      devAdvance7.onclick = ()=>{
+        const offset = Number(localStorage.getItem(DAY_OFFSET_KEY) || 0);
+        localStorage.setItem(DAY_OFFSET_KEY, String(offset + 7));
+        alert('Simulated moving forward 7 days. Reloading...');
+        location.reload();
+      };
+    }
+    const devReset = document.getElementById('pl-dev-reset');
+    if(devReset){
+      devReset.onclick = ()=>{
+        if(confirm('Clear all localStorage and reload?')){
+          localStorage.clear();
+          sessionStorage.clear();
+          location.reload();
+        }
+      };
+    }
+
     const manageBtn = document.getElementById('pl-manage-courses');
     if(manageBtn) manageBtn.onclick = ()=>{
       showCourseManager = !showCourseManager;
@@ -1468,12 +1610,18 @@ if ('serviceWorker' in navigator) {
     root.querySelectorAll('.pl-log').forEach(b=>b.onclick=()=>{
       const it = items[b.dataset.i];
       it.done = Math.min(it.done+1, it.total);
+      const hadActiveItemsBefore = items.some(x=>!x.completed && !x.archived);
       if(it.done>=it.total && !it.completed){
         it.completed = true;
         it.completedAt = today();
         if(it.recurring) items.push(makeRecurringClone(it));
         const rect = b.getBoundingClientRect();
-        burstConfetti(rect.left + rect.width/2, rect.top + rect.height/2);
+        const remainingAfter = items.filter(x=>!x.completed && !x.archived).length;
+        if(remainingAfter===0 && hadActiveItemsBefore){
+          triggerCelebration(window.innerWidth/2, window.innerHeight*0.25, true);
+        } else {
+          triggerCelebration(rect.left + rect.width/2, rect.top + rect.height/2, false);
+        }
       }
       save();
     });
@@ -1531,6 +1679,7 @@ if ('serviceWorker' in navigator) {
     root.querySelectorAll('.pl-complete').forEach(b=>b.onclick=()=>{
       const it = items[b.dataset.i];
       const completing = !it.completed;
+      const hadActiveItemsBefore = items.some(x=>!x.completed && !x.archived);
       it.completed = !it.completed;
       if(it.completed){
         it.done = it.total;
@@ -1542,7 +1691,12 @@ if ('serviceWorker' in navigator) {
       }
       if(completing){
         const rect = b.getBoundingClientRect();
-        burstConfetti(rect.left + rect.width/2, rect.top + rect.height/2);
+        const remainingAfter = items.filter(x=>!x.completed && !x.archived).length;
+        if(remainingAfter===0 && hadActiveItemsBefore){
+          triggerCelebration(window.innerWidth/2, window.innerHeight*0.25, true);
+        } else {
+          triggerCelebration(rect.left + rect.width/2, rect.top + rect.height/2, false);
+        }
       }
       save();
     });
@@ -1583,10 +1737,6 @@ if ('serviceWorker' in navigator) {
       });
     });
 
-    if(pendingBigConfetti){
-      pendingBigConfetti = false;
-      burstBigConfetti();
-    }
   }
   render();
 })();
