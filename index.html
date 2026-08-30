@@ -40,8 +40,9 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
   #pl-app .pl-today .pl-today-row{flex-direction:column;gap:0;}
   #pl-app .pl-today .pl-today-row span:last-child{font-weight:600;opacity:0.85;}
 }
-#pl-app .pl-summary{font-size:12.5px;color:var(--pl-muted);margin:-4px 0 12px;}
-#pl-app .pl-week{display:flex;gap:6px;margin:0 0 14px;align-items:flex-end;}
+#pl-app .pl-week-block{background:var(--pl-card-bg);border-radius:10px;padding:10px 12px 12px;margin-bottom:14px;}
+#pl-app .pl-summary{font-size:12.5px;color:var(--pl-muted);margin-bottom:8px;}
+#pl-app .pl-week{display:flex;gap:6px;align-items:flex-end;}
 #pl-app .pl-week-col{flex:1;display:flex;flex-direction:column;align-items:center;font-size:10px;color:var(--pl-muted);}
 #pl-app .pl-week-bar{width:100%;background:var(--pl-bar-bg);border-radius:4px 4px 0 0;display:flex;align-items:flex-start;justify-content:center;color:#fff;font-size:10px;min-height:4px;}
 #pl-app .pl-week-bar-stack{width:100%;display:flex;flex-direction:column-reverse;border-radius:4px 4px 0 0;overflow:hidden;}
@@ -76,11 +77,45 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
 #pl-app .pl-topbar input{width:200px;margin-bottom:0;}
 #pl-app .pl-topbar button{margin:0;white-space:nowrap;}
 #pl-app .pl-controls select[multiple]{height:32px;overflow-y:auto;}
+#pl-app details.pl-completed-dropdown{position:relative;display:inline-block;}
+#pl-app details.pl-completed-dropdown summary{
+  cursor:pointer;list-style:none;display:inline-block;
+  padding:6px;border-radius:6px;border:1px solid var(--pl-border);
+  background:var(--pl-input-bg);color:var(--pl-fg);font-size:13px;font-family:inherit;
+}
+#pl-app details.pl-completed-dropdown summary::-webkit-details-marker{display:none;}
+#pl-app .pl-dropdown-panel{
+  position:absolute;top:100%;left:0;
+  background:color-mix(in srgb, var(--pl-modal-bg) 78%, transparent);
+  backdrop-filter:blur(18px) saturate(180%);
+  -webkit-backdrop-filter:blur(18px) saturate(180%);
+  border:1px solid var(--pl-border);
+  border-radius:12px;
+  padding:10px 12px;
+  margin-top:6px;
+  z-index:50;
+  white-space:nowrap;
+  box-shadow:0 8px 30px var(--pl-modal-shadow);
+  animation:pl-glass-in 0.18s ease-out;
+}
+@keyframes pl-glass-in{
+  from{ opacity:0; transform:scale(0.96) translateY(-4px); }
+  to{ opacity:1; transform:scale(1) translateY(0); }
+}
 #pl-app .pl-dropdown-panel label{display:flex;align-items:center;gap:6px;font-size:13px;margin-bottom:6px;}
 #pl-app .pl-dropdown-panel label:last-child{margin-bottom:0;}
 #pl-app .pl-dropdown-panel input[type="checkbox"]{width:auto;margin:0;}
 #pl-app .pl-io{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
 #pl-app .pl-io button{background:#5a5f72;}
+#pl-app details.pl-export-dropdown{position:relative;display:inline-block;margin-right:4px;margin-top:4px;}
+#pl-app details.pl-export-dropdown summary{
+  cursor:pointer;list-style:none;display:inline-block;
+  padding:6px 12px;border-radius:6px;border:none;
+  background:#5a5f72;color:#fff;font-size:13px;font-family:inherit;line-height:normal;
+}
+#pl-app details.pl-export-dropdown summary::-webkit-details-marker{display:none;}
+#pl-app .pl-export-dropdown .pl-dropdown-panel{display:flex;flex-direction:column;gap:6px;}
+#pl-app .pl-export-dropdown .pl-dropdown-panel button{margin:0;width:100%;}
 #pl-app .pl-waiting{font-style:italic;color:var(--pl-muted);}
 #pl-app .pl-notes{font-size:12.5px;color:var(--pl-muted);margin-top:4px;white-space:pre-wrap;}
 #pl-app .pl-subtasks{margin-top:8px;font-size:12.5px;}
@@ -505,7 +540,7 @@ if ('serviceWorker' in navigator) {
     reader.readAsText(file);
   }
 
-  function weekChartHtml(){
+  function weekChartHtml(summaryText){
     const days = [];
     for(let i=0;i<7;i++){
       const d = addDays(today(), i);
@@ -518,7 +553,7 @@ if ('serviceWorker' in navigator) {
       days.push({d, total: dayItems.length, byCourse});
     }
     const max = Math.max(1, ...days.map(x=>x.total));
-    return `<div class="pl-week">` + days.map(x=>{
+    const barsHtml = days.map(x=>{
       const label = new Date(x.d+'T00:00:00').toLocaleDateString(undefined,{weekday:'short'});
       const totalH = Math.round((x.total/max)*36)+4;
       const courseEntries = Object.entries(x.byCourse);
@@ -534,7 +569,11 @@ if ('serviceWorker' in navigator) {
         `</div>`;
       }
       return `<div class="pl-week-col">${barHtml}<div class="pl-week-label">${label}</div></div>`;
-    }).join('') + `</div>`;
+    }).join('');
+    return `<div class="pl-week-block">
+      <div class="pl-summary">${summaryText}</div>
+      <div class="pl-week">${barsHtml}</div>
+    </div>`;
   }
 
   function render(){
@@ -559,19 +598,22 @@ if ('serviceWorker' in navigator) {
         <option value="due" ${sortMode==='due'?'selected':''}>Due date</option>
         <option value="custom" ${sortMode==='custom'?'selected':''}>Custom (drag order)</option>
       </select></label>
-      <label>Completed: <select id="pl-completed-multi" multiple size="1">
-        <option value="completed" ${!hideDone?'selected':''}>Show completed</option>
-        <option value="archived" ${showArchived?'selected':''}>Show archived</option>
-      </select></label>
+      <label>Completed: <details class="pl-completed-dropdown">
+        <summary>Filter \u25be</summary>
+        <div class="pl-dropdown-panel">
+          <label><input type="checkbox" id="pl-show-completed" ${!hideDone?'checked':''}> Show completed</label>
+          <label><input type="checkbox" id="pl-show-archived" ${showArchived?'checked':''}> Show archived</label>
+        </div>
+      </details></label>
     </div>`;
 
     const totalActive = items.filter(i=>!i.completed).length;
     const totalCompleted = items.filter(i=>i.completed).length;
     const thisWeek = completedThisWeek();
     const streak = currentStreak();
-    html += `<div class="pl-summary">${totalActive} active \u00b7 ${totalCompleted} completed \u00b7 ${thisWeek} this week${streak>0? ' \u00b7 '+streak+'-day streak':''}</div>`;
+    const summaryText = `${totalActive} active \u00b7 ${totalCompleted} completed \u00b7 ${thisWeek} this week${streak>0? ' \u00b7 '+streak+'-day streak':''}`;
 
-    html += weekChartHtml();
+    html += weekChartHtml(summaryText);
 
     if(selected.size>0){
       html += `<div class="pl-bulkbar">
@@ -677,12 +719,17 @@ if ('serviceWorker' in navigator) {
     });
 
     html += `<div class="pl-io">
-      <button id="pl-export">Export Backup</button>
+      <details class="pl-export-dropdown">
+        <summary>Export \u25be</summary>
+        <div class="pl-dropdown-panel">
+          <button id="pl-export" class="pl-secondary">Backup (JSON)</button>
+          <button id="pl-export-ics" class="pl-secondary">Calendar (.ics)</button>
+        </div>
+      </details>
       <label style="display:inline-block;">
         <button id="pl-import-btn" class="pl-secondary">Import Backup</button>
         <input type="file" id="pl-import" accept="application/json" style="display:none;">
       </label>
-      <button id="pl-export-ics" class="pl-secondary">Export Calendar (.ics)</button>
       <button id="pl-clear-completed" class="pl-danger">Clear Completed</button>
     </div>`;
 
@@ -794,12 +841,8 @@ if ('serviceWorker' in navigator) {
     if(cancelBtn) cancelBtn.onclick = ()=>{ editIndex=null; showForm=false; render(); };
 
     document.getElementById('pl-sort').onchange = (e)=>{ sortMode=e.target.value; savePrefs(); render(); };
-    document.getElementById('pl-completed-multi').onchange = (e)=>{
-      const selected = Array.from(e.target.selectedOptions).map(o=>o.value);
-      hideDone = !selected.includes('completed');
-      showArchived = selected.includes('archived');
-      savePrefs(); render();
-    };
+    document.getElementById('pl-show-completed').onchange = (e)=>{ hideDone = !e.target.checked; savePrefs(); render(); };
+    document.getElementById('pl-show-archived').onchange = (e)=>{ showArchived = e.target.checked; savePrefs(); render(); };
     document.getElementById('pl-filter').oninput = (e)=>{
       pendingFocus = {id:'pl-filter', selStart:e.target.selectionStart, selEnd:e.target.selectionEnd};
       searchTerm=e.target.value; savePrefs(); render();
@@ -931,6 +974,18 @@ if ('serviceWorker' in navigator) {
       }
       pendingAnchorId = null;
     }
+
+    root.querySelectorAll('details.pl-completed-dropdown, details.pl-export-dropdown').forEach(d=>{
+      d.addEventListener('toggle', ()=>{
+        if(!d.open) return;
+        requestAnimationFrame(()=>{
+          const panel = d.querySelector('.pl-dropdown-panel');
+          if(!panel) return;
+          const overflow = panel.getBoundingClientRect().bottom - window.innerHeight;
+          if(overflow > 0) window.scrollBy({top: overflow + 16, behavior:'smooth'});
+        });
+      });
+    });
   }
   render();
 })();
