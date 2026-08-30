@@ -144,7 +144,7 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
 #pl-app .pl-recurring-tag{font-size:11px;color:var(--pl-muted);margin-left:6px;}
 #pl-app .pl-bottom-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:13px;color:var(--pl-muted);}
 #pl-app .pl-bottom-row select{width:auto;display:inline-block;margin-bottom:0;}
-#pl-app .pl-course-manager{margin-top:10px;padding:10px;border-radius:8px;background:var(--pl-card-bg);}
+#pl-app .pl-course-manager{margin-top:10px;padding:10px;border-radius:8px;background:var(--pl-card-bg);scroll-margin-bottom:100px;}
 #pl-app .pl-course-row{display:flex;gap:8px;align-items:center;margin-bottom:6px;}
 #pl-app .pl-course-row input[type="text"]{flex:1;margin-bottom:0;}
 #pl-app .pl-course-row input[type="color"]{width:40px;padding:0;height:32px;margin-bottom:0;}
@@ -977,7 +977,7 @@ if ('serviceWorker' in navigator) {
 
     if(pendingScrollId){
       const scrollEl = document.getElementById(pendingScrollId);
-      if(scrollEl) scrollEl.scrollIntoView({behavior:'smooth', block:'nearest'});
+      if(scrollEl) scrollEl.scrollIntoView({behavior:'smooth', block:'end'});
       pendingScrollId = null;
     }
 
