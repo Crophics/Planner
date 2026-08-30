@@ -314,6 +314,44 @@ if ('serviceWorker' in navigator) {
     save();
   }
 
+  function burstConfetti(x, y){
+    if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const colors = ['#4f8b74','#f0a824','#e8553c','#4361ee','#b83fd1','#2ea9dd','#e0538a','#ffd23f'];
+    const count = 30;
+    for(let i=0;i<count;i++){
+      const el = document.createElement('div');
+      const isCircle = Math.random() < 0.45;
+      const size = 5 + Math.random()*7;
+      el.style.position = 'fixed';
+      el.style.left = x+'px';
+      el.style.top = y+'px';
+      el.style.width = size+'px';
+      el.style.height = (isCircle? size : size*0.4)+'px';
+      el.style.background = colors[Math.floor(Math.random()*colors.length)];
+      el.style.borderRadius = isCircle ? '50%' : '2px';
+      el.style.pointerEvents = 'none';
+      el.style.zIndex = '3000';
+      el.style.willChange = 'transform, opacity';
+      document.body.appendChild(el);
+      // Mostly-upward "party popper" spread rather than a flat radial burst.
+      const angle = -Math.PI/2 + (Math.random()-0.5)*Math.PI*1.7;
+      const power = 90 + Math.random()*130;
+      const dx = Math.cos(angle)*power;
+      const dyBurst = Math.sin(angle)*power;
+      const wobble = (Math.random()-0.5)*50;
+      const rotateStart = Math.random()*360;
+      const rotateEnd = rotateStart + (Math.random()*900 - 450);
+      const duration = 1500 + Math.random()*700;
+      const anim = el.animate([
+        { transform:`translate(0,0) rotate(${rotateStart}deg) scale(0.3)`, opacity:1, offset:0 },
+        { transform:`translate(${dx}px, ${dyBurst}px) rotate(${rotateStart + rotateEnd*0.3}deg) scale(1)`, opacity:1, offset:0.3 },
+        { transform:`translate(${dx+wobble}px, ${dyBurst+150}px) rotate(${rotateEnd}deg) scale(0.9)`, opacity:0.9, offset:0.75 },
+        { transform:`translate(${dx+wobble*1.4}px, ${dyBurst+280}px) rotate(${rotateEnd+130}deg) scale(0.8)`, opacity:0, offset:1 }
+      ], { duration, easing:'cubic-bezier(.17,.89,.32,1.25)', fill:'forwards' });
+      anim.onfinish = () => el.remove();
+    }
+  }
+
   function save(){ localStorage.setItem(KEY, JSON.stringify(items)); render(); }
   function today(){ const d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
   function daysBetween(a,b){ return Math.round((new Date(b)-new Date(a))/86400000); }
@@ -943,7 +981,11 @@ if ('serviceWorker' in navigator) {
     });
 
     const bulkCompleteBtn = document.getElementById('pl-bulk-complete');
-    if(bulkCompleteBtn) bulkCompleteBtn.onclick = bulkComplete;
+    if(bulkCompleteBtn) bulkCompleteBtn.onclick = ()=>{
+      const rect = bulkCompleteBtn.getBoundingClientRect();
+      bulkComplete();
+      burstConfetti(rect.left + rect.width/2, rect.top + rect.height/2);
+    };
     const bulkDeleteBtn = document.getElementById('pl-bulk-delete');
     if(bulkDeleteBtn) bulkDeleteBtn.onclick = bulkDelete;
     const bulkClearBtn = document.getElementById('pl-bulk-clear');
@@ -984,6 +1026,7 @@ if ('serviceWorker' in navigator) {
     });
     root.querySelectorAll('.pl-complete').forEach(b=>b.onclick=()=>{
       const it = items[b.dataset.i];
+      const completing = !it.completed;
       it.completed = !it.completed;
       if(it.completed){
         it.done = it.total;
@@ -993,6 +1036,10 @@ if ('serviceWorker' in navigator) {
       } else {
         it.completedAt = null;
         it.archived = false;
+      }
+      if(completing){
+        const rect = b.getBoundingClientRect();
+        burstConfetti(rect.left + rect.width/2, rect.top + rect.height/2);
       }
       save();
     });
