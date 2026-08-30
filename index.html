@@ -73,17 +73,32 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
 #pl-app .pl-tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;color:#fff;margin-bottom:4px;}
 #pl-app .pl-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0;font-size:13px;}
 #pl-app .pl-controls select,#pl-app .pl-controls input{width:auto;margin-bottom:0;}
-#pl-app .pl-topbar{display:flex;gap:8px;align-items:center;margin-bottom:10px;}
-#pl-app .pl-topbar input{width:200px;margin-bottom:0;}
-#pl-app .pl-topbar button{margin:0;white-space:nowrap;}
-#pl-app .pl-controls select[multiple]{height:32px;overflow-y:auto;}
-#pl-app details.pl-completed-dropdown{position:relative;display:inline-block;}
-#pl-app details.pl-completed-dropdown summary{
-  cursor:pointer;list-style:none;display:inline-block;
-  padding:6px;border-radius:6px;border:1px solid var(--pl-border);
-  background:var(--pl-input-bg);color:var(--pl-fg);font-size:13px;font-family:inherit;
+#pl-app .pl-fab{
+  position:fixed;
+  bottom:24px;
+  right:24px;
+  width:56px;
+  height:56px;
+  border-radius:50%;
+  background:#4f8b74;
+  color:#fff;
+  font-size:28px;
+  line-height:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 4px 16px rgba(0,0,0,0.4);
+  z-index:900;
+  padding:0;
+  margin:0;
+  cursor:pointer;
+  border:none;
 }
-#pl-app details.pl-completed-dropdown summary::-webkit-details-marker{display:none;}
+#pl-app .pl-fab:hover{ filter:brightness(1.08); }
+#pl-app .pl-topbar{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;}
+#pl-app .pl-topbar input{flex:1;min-width:140px;margin-bottom:0;}
+#pl-app .pl-topbar select{width:auto;margin-bottom:0;}
+#pl-app .pl-controls select[multiple]{height:32px;overflow-y:auto;}
 #pl-app .pl-dropdown-panel{
   position:absolute;top:100%;left:0;
   background:color-mix(in srgb, var(--pl-modal-bg) 78%, transparent);
@@ -588,23 +603,12 @@ if ('serviceWorker' in navigator) {
     let html = '';
 
     html += `<div class="pl-topbar">
-      <button id="pl-add-toggle">+ Add Assignment</button>
       <input id="pl-filter" placeholder="Search title, course, notes..." value="${searchTerm}">
-    </div>`;
-
-    html += `<div class="pl-controls">
-      <label>Sort: <select id="pl-sort">
+      <select id="pl-sort">
         <option value="urgency" ${sortMode==='urgency'?'selected':''}>Urgency</option>
         <option value="due" ${sortMode==='due'?'selected':''}>Due date</option>
         <option value="custom" ${sortMode==='custom'?'selected':''}>Custom (drag order)</option>
-      </select></label>
-      <label>Completed: <details class="pl-completed-dropdown">
-        <summary>Filter \u25be</summary>
-        <div class="pl-dropdown-panel">
-          <label><input type="checkbox" id="pl-show-completed" ${!hideDone?'checked':''}> Show completed</label>
-          <label><input type="checkbox" id="pl-show-archived" ${showArchived?'checked':''}> Show archived</label>
-        </div>
-      </details></label>
+      </select>
     </div>`;
 
     const totalActive = items.filter(i=>!i.completed).length;
@@ -733,6 +737,11 @@ if ('serviceWorker' in navigator) {
       <button id="pl-clear-completed" class="pl-danger">Clear Completed</button>
     </div>`;
 
+    html += `<div class="pl-controls">
+      <label><input type="checkbox" id="pl-show-completed" style="width:auto;" ${!hideDone?'checked':''}> Show completed</label>
+      <label><input type="checkbox" id="pl-show-archived" style="width:auto;" ${showArchived?'checked':''}> Show archived</label>
+    </div>`;
+
     html += `<div class="pl-bottom-row">
       <label>Theme: <select id="pl-theme-select">
         <option value="dark" ${theme==='dark'?'selected':''}>Dark</option>
@@ -774,6 +783,8 @@ if ('serviceWorker' in navigator) {
         </div>
       </div>`;
     }
+
+    html += `<button id="pl-add-toggle" class="pl-fab" aria-label="Add Assignment">+</button>`;
 
     root.innerHTML = html;
 
@@ -975,7 +986,7 @@ if ('serviceWorker' in navigator) {
       pendingAnchorId = null;
     }
 
-    root.querySelectorAll('details.pl-completed-dropdown, details.pl-export-dropdown').forEach(d=>{
+    root.querySelectorAll('details.pl-export-dropdown').forEach(d=>{
       d.addEventListener('toggle', ()=>{
         if(!d.open) return;
         requestAnimationFrame(()=>{
