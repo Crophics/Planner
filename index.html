@@ -977,7 +977,14 @@ if ('serviceWorker' in navigator) {
 
     if(pendingScrollId){
       const scrollEl = document.getElementById(pendingScrollId);
-      if(scrollEl) scrollEl.scrollIntoView({behavior:'smooth', block:'end'});
+      if(scrollEl){
+        requestAnimationFrame(()=>{
+          const margin = 100;
+          const rect = scrollEl.getBoundingClientRect();
+          const targetY = window.scrollY + rect.bottom - window.innerHeight + margin;
+          window.scrollTo({top: Math.max(targetY, 0), behavior:'smooth'});
+        });
+      }
       pendingScrollId = null;
     }
 
