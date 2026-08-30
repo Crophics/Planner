@@ -286,6 +286,7 @@ if ('serviceWorker' in navigator) {
   const PREFS_KEY='pl-prefs';
   const COURSE_COLORS_KEY='pl-course-colors';
   const COMPLETION_LOG_KEY='pl-completion-log';
+  const DAY_COMPLETE_LOG_KEY='pl-day-complete-log';
   const ARCHIVE_AFTER_DAYS=14;
 
   let items = JSON.parse(localStorage.getItem(KEY) || '[]');
@@ -301,6 +302,8 @@ if ('serviceWorker' in navigator) {
   let pendingTodayAnim = false;
   let overdueFilterActive = false;
   let dragSrcIndex = null;
+  let prevAllRequiredDone = null;
+  let pendingBigConfetti = false;
 
   let prefs = {};
   try{ prefs = JSON.parse(localStorage.getItem(PREFS_KEY)) || {}; }catch(e){ prefs = {}; }
@@ -318,6 +321,15 @@ if ('serviceWorker' in navigator) {
   let completionLog = [];
   try{ completionLog = JSON.parse(localStorage.getItem(COMPLETION_LOG_KEY)) || []; }catch(e){ completionLog = []; }
   function saveCompletionLog(){ localStorage.setItem(COMPLETION_LOG_KEY, JSON.stringify(completionLog)); }
+  // Logged only on days where nothing required is left \u2014 not just "did
+  // something" \u2014 so the streak reflects actually staying caught up.
+  let dayCompleteLog = [];
+  try{ dayCompleteLog = JSON.parse(localStorage.getItem(DAY_COMPLETE_LOG_KEY)) || []; }catch(e){ dayCompleteLog = []; }
+  function saveDayCompleteLog(){ localStorage.setItem(DAY_COMPLETE_LOG_KEY, JSON.stringify(dayCompleteLog)); }
+  function logDayComplete(){
+    const t = today();
+    if(!dayCompleteLog.includes(t)){ dayCompleteLog.push(t); saveDayCompleteLog(); }
+  }
 
   function savePrefs(){
     localStorage.setItem(PREFS_KEY, JSON.stringify({sortMode,hideDone,showArchived,searchTerm,theme,todayExpanded}));
@@ -446,14 +458,15 @@ if ('serviceWorker' in navigator) {
     return true;
   }
 
-  function burstConfetti(x, y){
+  function burstConfetti(x, y, opts){
     if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const big = !!(opts && opts.big);
     const colors = ['#4f8b74','#f0a824','#e8553c','#4361ee','#b83fd1','#2ea9dd','#e0538a','#ffd23f'];
-    const count = 30;
+    const count = big ? 70 : 30;
     for(let i=0;i<count;i++){
       const el = document.createElement('div');
       const isCircle = Math.random() < 0.45;
-      const size = 5 + Math.random()*7;
+      const size = (big? 6:5) + Math.random()*(big? 10:7);
       el.style.position = 'fixed';
       el.style.left = x+'px';
       el.style.top = y+'px';
@@ -466,22 +479,29 @@ if ('serviceWorker' in navigator) {
       el.style.willChange = 'transform, opacity';
       document.body.appendChild(el);
       // Mostly-upward "party popper" spread rather than a flat radial burst.
-      const angle = -Math.PI/2 + (Math.random()-0.5)*Math.PI*1.7;
-      const power = 90 + Math.random()*130;
+      const angle = -Math.PI/2 + (Math.random()-0.5)*Math.PI*(big?1.9:1.7);
+      const power = (big? 140:90) + Math.random()*(big?220:130);
       const dx = Math.cos(angle)*power;
       const dyBurst = Math.sin(angle)*power;
-      const wobble = (Math.random()-0.5)*50;
+      const wobble = (Math.random()-0.5)*(big?70:50);
       const rotateStart = Math.random()*360;
       const rotateEnd = rotateStart + (Math.random()*900 - 450);
-      const duration = 1500 + Math.random()*700;
+      const duration = (big? 1900:1500) + Math.random()*(big?900:700);
       const anim = el.animate([
         { transform:`translate(0,0) rotate(${rotateStart}deg) scale(0.3)`, opacity:1, offset:0 },
         { transform:`translate(${dx}px, ${dyBurst}px) rotate(${rotateStart + rotateEnd*0.3}deg) scale(1)`, opacity:1, offset:0.3 },
         { transform:`translate(${dx+wobble}px, ${dyBurst+150}px) rotate(${rotateEnd}deg) scale(0.9)`, opacity:0.9, offset:0.75 },
-        { transform:`translate(${dx+wobble*1.4}px, ${dyBurst+280}px) rotate(${rotateEnd+130}deg) scale(0.8)`, opacity:0, offset:1 }
+        { transform:`translate(${dx+wobble*1.4}px, ${dyBurst+(big?320:280)}px) rotate(${rotateEnd+130}deg) scale(0.8)`, opacity:0, offset:1 }
       ], { duration, easing:'cubic-bezier(.17,.89,.32,1.25)', fill:'forwards' });
       anim.onfinish = () => el.remove();
     }
+  }
+  // Bigger celebration for clearing everything required today: fires from
+  // three points across the top of the screen instead of one spot, so it
+  // reads as a clearly bigger moment than finishing a single item.
+  function burstBigConfetti(){
+    const y = Math.min(160, window.innerHeight*0.25);
+    [0.2, 0.5, 0.8].forEach(f=> burstConfetti(window.innerWidth*f, y, {big:true}));
   }
 
   function save(){ localStorage.setItem(KEY, JSON.stringify(items)); render(); }
@@ -531,6 +551,16 @@ if ('serviceWorker' in navigator) {
     return prereq ? !prereq.completed : false;
   }
 
+  // An item whose prerequisite was JUST completed today shouldn't immediately
+  // join Today's Targets (required or optional) \u2014 that would make it look
+  // like there's still more to do the same day you already made progress on
+  // that chain. It surfaces normally starting tomorrow.
+  function unlockedToday(it){
+    if(!it.dependsOn) return false;
+    const prereq = items.find(x=>x.title===it.dependsOn);
+    return !!(prereq && prereq.completed && prereq.completedAt===today());
+  }
+
   // Reorders items by dragging: src/target are indices into the `items` array.
   // Renumbers `order` only for the currently visible+sorted set (`currentList`)
   // so items hidden by filters keep their existing relative order untouched.
@@ -575,7 +605,7 @@ if ('serviceWorker' in navigator) {
   }
   function currentStreak(){
     let streak=0, d=today();
-    while(completionLog.includes(d)){ streak++; d=addDays(d,-1); }
+    while(dayCompleteLog.includes(d)){ streak++; d=addDays(d,-1); }
     return streak;
   }
   function completedThisWeek(){
@@ -873,7 +903,7 @@ if ('serviceWorker' in navigator) {
       return daysBetween(today(),a.it.due) - daysBetween(today(),b.it.due);
     });
 
-    const active = items.filter(x=>!x.completed && !x.archived && !isLocked(x));
+    const active = items.filter(x=>!x.completed && !x.archived && !isLocked(x) && !unlockedToday(x));
     const multi = active.filter(it=>it.total>1);
     const singles = active.filter(it=>it.total<=1 && it.done<it.total);
 
@@ -1018,6 +1048,10 @@ if ('serviceWorker' in navigator) {
 
     const hasRequired = requiredTight.length || requiredPace.length;
     const pickBuckets = optionalBuckets.filter(b=>b.pickCount);
+    const allRequiredDoneToday = !hasRequired && pickBuckets.length===0;
+    if(allRequiredDoneToday) logDayComplete();
+    if(prevAllRequiredDone===false && allRequiredDoneToday) pendingBigConfetti = true;
+    prevAllRequiredDone = allRequiredDoneToday;
     const requiredRowsHtml = requiredTight.map(t=>requiredRowHtml(t,false)).join('') + requiredPace.map(t=>requiredRowHtml(t,true)).join('');
 
     const compactHasAnything = hasRequired || pickBuckets.length;
@@ -1432,7 +1466,16 @@ if ('serviceWorker' in navigator) {
     });
 
     root.querySelectorAll('.pl-log').forEach(b=>b.onclick=()=>{
-      const it = items[b.dataset.i]; it.done = Math.min(it.done+1, it.total); save();
+      const it = items[b.dataset.i];
+      it.done = Math.min(it.done+1, it.total);
+      if(it.done>=it.total && !it.completed){
+        it.completed = true;
+        it.completedAt = today();
+        if(it.recurring) items.push(makeRecurringClone(it));
+        const rect = b.getBoundingClientRect();
+        burstConfetti(rect.left + rect.width/2, rect.top + rect.height/2);
+      }
+      save();
     });
     root.querySelectorAll('.pl-move-up').forEach(b=>b.onclick=()=>{
       const pos = parseInt(b.dataset.pos);
@@ -1492,7 +1535,6 @@ if ('serviceWorker' in navigator) {
       if(it.completed){
         it.done = it.total;
         it.completedAt = today();
-        logCompletionToday();
         if(it.recurring) items.push(makeRecurringClone(it));
       } else {
         it.completedAt = null;
@@ -1540,6 +1582,11 @@ if ('serviceWorker' in navigator) {
         });
       });
     });
+
+    if(pendingBigConfetti){
+      pendingBigConfetti = false;
+      burstBigConfetti();
+    }
   }
   render();
 })();
