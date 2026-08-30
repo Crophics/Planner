@@ -72,6 +72,16 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
 #pl-app .pl-tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;color:#fff;margin-bottom:4px;}
 #pl-app .pl-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0;font-size:13px;}
 #pl-app .pl-controls select,#pl-app .pl-controls input{width:auto;margin-bottom:0;}
+#pl-app .pl-topbar{display:flex;gap:8px;align-items:center;margin-bottom:10px;}
+#pl-app .pl-topbar input{width:200px;margin-bottom:0;}
+#pl-app .pl-topbar button{margin:0;white-space:nowrap;}
+#pl-app details.pl-completed-dropdown{position:relative;}
+#pl-app details.pl-completed-dropdown summary{cursor:pointer;list-style:none;padding:4px 0;}
+#pl-app details.pl-completed-dropdown summary::-webkit-details-marker{display:none;}
+#pl-app .pl-dropdown-panel{position:absolute;top:100%;left:0;background:var(--pl-modal-bg);border:1px solid var(--pl-border);border-radius:8px;padding:8px 10px;margin-top:4px;z-index:50;white-space:nowrap;box-shadow:0 4px 12px var(--pl-modal-shadow);}
+#pl-app .pl-dropdown-panel label{display:flex;align-items:center;gap:6px;font-size:13px;margin-bottom:6px;}
+#pl-app .pl-dropdown-panel label:last-child{margin-bottom:0;}
+#pl-app .pl-dropdown-panel input[type="checkbox"]{width:auto;margin:0;}
 #pl-app .pl-io{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
 #pl-app .pl-io button{background:#5a5f72;}
 #pl-app .pl-waiting{font-style:italic;color:var(--pl-muted);}
@@ -541,7 +551,10 @@ if ('serviceWorker' in navigator) {
 
     let html = '';
 
-    html += `<button id="pl-add-toggle" style="margin-bottom:14px;">+ Add Assignment</button>`;
+    html += `<div class="pl-topbar">
+      <button id="pl-add-toggle">+ Add Assignment</button>
+      <input id="pl-filter" placeholder="Search title, course, notes..." value="${searchTerm}">
+    </div>`;
 
     html += `<div class="pl-controls">
       <label>Sort: <select id="pl-sort">
@@ -549,9 +562,13 @@ if ('serviceWorker' in navigator) {
         <option value="due" ${sortMode==='due'?'selected':''}>Due date</option>
         <option value="custom" ${sortMode==='custom'?'selected':''}>Custom (drag order)</option>
       </select></label>
-      <label><input type="checkbox" id="pl-hide" style="width:auto;" ${hideDone?'checked':''}> Hide completed</label>
-      <label><input type="checkbox" id="pl-show-archived" style="width:auto;" ${showArchived?'checked':''}> Show archived</label>
-      <input id="pl-filter" placeholder="Search title, course, notes..." value="${searchTerm}">
+      <details class="pl-completed-dropdown">
+        <summary>Completed \u25be</summary>
+        <div class="pl-dropdown-panel">
+          <label><input type="checkbox" id="pl-show-completed" ${!hideDone?'checked':''}> Show completed</label>
+          <label><input type="checkbox" id="pl-show-archived" ${showArchived?'checked':''}> Show archived</label>
+        </div>
+      </details>
     </div>`;
 
     const totalActive = items.filter(i=>!i.completed).length;
@@ -783,8 +800,8 @@ if ('serviceWorker' in navigator) {
     if(cancelBtn) cancelBtn.onclick = ()=>{ editIndex=null; showForm=false; render(); };
 
     document.getElementById('pl-sort').onchange = (e)=>{ sortMode=e.target.value; savePrefs(); render(); };
-    document.getElementById('pl-hide').onchange = (e)=>{ hideDone=e.target.checked; savePrefs(); render(); };
-    document.getElementById('pl-show-archived').onchange = (e)=>{ showArchived=e.target.checked; savePrefs(); render(); };
+    document.getElementById('pl-show-completed').onchange = (e)=>{ hideDone = !e.target.checked; savePrefs(); render(); };
+    document.getElementById('pl-show-archived').onchange = (e)=>{ showArchived = e.target.checked; savePrefs(); render(); };
     document.getElementById('pl-filter').oninput = (e)=>{
       pendingFocus = {id:'pl-filter', selStart:e.target.selectionStart, selEnd:e.target.selectionEnd};
       searchTerm=e.target.value; savePrefs(); render();
