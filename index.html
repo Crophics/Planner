@@ -31,8 +31,9 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
   #pl-app .pl-card{padding:12px;}
   #pl-app .pl-controls{gap:6px;}
   #pl-app .pl-io{gap:6px;}
-  #pl-app .pl-actions-row{flex-direction:column;align-items:stretch;gap:6px;}
-  #pl-app .pl-actions{display:flex;flex-wrap:nowrap;gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;}
+  #pl-app .pl-actions-row{gap:8px;}
+  #pl-app .pl-actions-row > span:first-child{flex:0 0 auto;white-space:nowrap;}
+  #pl-app .pl-actions{display:flex;flex-wrap:nowrap;gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;justify-content:flex-end;}
   #pl-app .pl-actions button{flex:0 0 auto;margin:0;padding:6px 10px;font-size:12.5px;white-space:nowrap;}
 }
 #pl-app{max-width:640px;font-family:inherit;padding-bottom:90px;}
