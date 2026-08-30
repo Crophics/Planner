@@ -32,8 +32,8 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
   #pl-app .pl-controls{gap:6px;}
   #pl-app .pl-io{gap:6px;}
   #pl-app .pl-actions-row{flex-direction:column;align-items:stretch;gap:6px;}
-  #pl-app .pl-actions{display:flex;gap:4px;flex-wrap:nowrap;}
-  #pl-app .pl-actions button{flex:1 1 0;min-width:0;margin:0;padding:6px 2px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;}
+  #pl-app .pl-actions{display:flex;flex-wrap:wrap;gap:6px;}
+  #pl-app .pl-actions button{flex:1 1 calc(50% - 6px);min-width:0;margin:0;padding:7px 4px;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;}
 }
 #pl-app{max-width:640px;font-family:inherit;padding-bottom:90px;}
 #pl-app .pl-today{background:var(--pl-today-bg);color:var(--pl-today-fg);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;}
