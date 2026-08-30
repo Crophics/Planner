@@ -2,10 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Planner</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png">
+<meta name="theme-color" content="#14161f">
 <style>
 :root[data-theme="dark"]{
   --pl-bg:#111111; --pl-fg:#e8e6df; --pl-card-bg:rgba(255,255,255,0.04);
@@ -33,10 +34,10 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
   #pl-app .pl-io{gap:6px;}
   #pl-app .pl-actions-row{gap:8px;}
   #pl-app .pl-actions-row > span:first-child{flex:0 0 auto;white-space:nowrap;}
-  #pl-app .pl-actions{display:flex;flex-wrap:nowrap;gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;justify-content:flex-end;}
-  #pl-app .pl-actions button{flex:0 0 auto;margin:0;padding:6px 10px;font-size:12.5px;white-space:nowrap;}
+  #pl-app .pl-actions{display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;justify-content:flex-end;}
+  #pl-app .pl-actions button{flex:0 0 auto;margin:0;padding:9px 12px;font-size:12.5px;white-space:nowrap;min-height:38px;display:inline-flex;align-items:center;}
 }
-#pl-app{max-width:640px;font-family:inherit;padding-bottom:90px;}
+#pl-app{max-width:640px;font-family:inherit;padding-bottom:calc(90px + env(safe-area-inset-bottom));}
 #pl-app .pl-today{background:var(--pl-today-bg);color:var(--pl-today-fg);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;}
 #pl-app .pl-today b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:1px;opacity:0.7;margin-bottom:6px;}
 #pl-app .pl-today .pl-today-row{display:flex;justify-content:space-between;margin-top:4px;gap:8px;}
@@ -67,19 +68,19 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
 #pl-app .pl-card-head input[type="checkbox"]{width:auto;margin:3px 0 0;}
 #pl-app input,#pl-app select,#pl-app textarea{width:100%;box-sizing:border-box;padding:6px;margin-bottom:8px;border-radius:6px;border:1px solid var(--pl-border);background:var(--pl-input-bg);color:var(--pl-fg);font-family:inherit;}
 #pl-app textarea{resize:vertical;min-height:50px;}
-#pl-app button{padding:6px 12px;border-radius:6px;border:none;background:#4f8b74;color:#fff;cursor:pointer;font-size:13px;margin-right:4px;margin-top:4px;}
+#pl-app button{padding:6px 12px;border-radius:6px;border:none;background:#4f8b74;color:#fff;cursor:pointer;font-size:13px;margin-right:4px;margin-top:4px;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;touch-action:manipulation;}
 #pl-app button.pl-secondary{background:#5a5f72;}
 #pl-app button.pl-complete{background:#4f8b74;}
 #pl-app button.pl-danger{background:#c96a48;}
 #pl-app .pl-bar{background:var(--pl-bar-bg);border-radius:4px;height:8px;overflow:hidden;margin:8px 0;}
-#pl-app .pl-fill{background:#4f8b74;height:100%;}
+#pl-app .pl-fill{background:#4f8b74;height:100%;transition:width 0.35s ease;}
 #pl-app .pl-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-top:6px;}
 #pl-app .pl-tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;color:#fff;margin-bottom:4px;}
 #pl-app .pl-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0;font-size:13px;}
 #pl-app .pl-controls select,#pl-app .pl-controls input{width:auto;margin-bottom:0;}
 #pl-app .pl-fab{
   position:fixed;
-  bottom:24px;
+  bottom:calc(24px + env(safe-area-inset-bottom));
   right:24px;
   width:56px;
   height:56px;
@@ -98,8 +99,11 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
   margin:0;
   cursor:pointer;
   border:none;
+  -webkit-touch-callout:none;-webkit-user-select:none;user-select:none;touch-action:manipulation;
+  transition:transform 0.15s ease, filter 0.15s ease;
 }
 #pl-app .pl-fab:hover{ filter:brightness(1.08); }
+#pl-app .pl-fab:active{ transform:scale(0.92); }
 #pl-app .pl-topbar{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;}
 #pl-app .pl-topbar input{flex:1;min-width:140px;margin-bottom:0;}
 #pl-app .pl-topbar select{width:auto;margin-bottom:0;}
@@ -152,7 +156,7 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
 #pl-modal-box{background:var(--pl-modal-bg);color:var(--pl-fg);border-radius:12px;padding:20px;max-width:420px;width:100%;max-height:90vh;overflow-y:auto;position:relative;box-shadow:0 10px 40px var(--pl-modal-shadow);}
 #pl-modal-close{position:absolute;top:10px;right:14px;background:none;border:none;font-size:24px;line-height:1;color:var(--pl-muted);cursor:pointer;padding:0;margin:0;}
 #pl-modal-close:hover{color:var(--pl-fg);}
-#pl-toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#2d2d2a;color:#fff;padding:10px 16px;border-radius:8px;display:none;align-items:center;gap:12px;font-size:13px;z-index:2000;box-shadow:0 6px 20px rgba(0,0,0,0.4);}
+#pl-toast{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:#2d2d2a;color:#fff;padding:10px 16px;border-radius:8px;display:none;align-items:center;gap:12px;font-size:13px;z-index:2000;box-shadow:0 6px 20px rgba(0,0,0,0.4);}
 #pl-toast button{background:#4f8b74;margin:0;padding:4px 10px;border:none;border-radius:6px;color:#fff;cursor:pointer;font-size:13px;}
 </style>
 </head>
@@ -218,12 +222,23 @@ if ('serviceWorker' in navigator) {
     localStorage.setItem(PREFS_KEY, JSON.stringify({sortMode,hideDone,showArchived,searchTerm,theme}));
   }
 
+  const THEME_COLORS = {dark:'#111111', light:'#f4f2ec', blue:'#14161f'};
+  function updateThemeColorMeta(eff){
+    let meta = document.querySelector('meta[name="theme-color"]');
+    if(!meta){
+      meta = document.createElement('meta');
+      meta.setAttribute('name','theme-color');
+      document.head.appendChild(meta);
+    }
+    meta.setAttribute('content', THEME_COLORS[eff] || THEME_COLORS.blue);
+  }
   function applyTheme(){
     let eff = theme;
     if(theme==='auto'){
       eff = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
     }
     document.documentElement.setAttribute('data-theme', eff);
+    updateThemeColorMeta(eff);
   }
   applyTheme();
   if(window.matchMedia){
@@ -299,7 +314,7 @@ if ('serviceWorker' in navigator) {
     save();
   }
 
-  function save(){ localStorage.setItem(KEY, JSON.stringify(items)); render(); }
+  function save(){ localStorage.setItem(KEY, JSON.stringify(items)); render(true); }
   function today(){ const d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
   function daysBetween(a,b){ return Math.round((new Date(b)-new Date(a))/86400000); }
   function addDays(dateStr, n){ const d=new Date(dateStr+'T00:00:00'); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
@@ -596,7 +611,7 @@ if ('serviceWorker' in navigator) {
     </div>`;
   }
 
-  function render(){
+  function render(animate){
     currentColorMap = computeCourseColorMap();
 
     let anchorBefore = null;
@@ -791,7 +806,12 @@ if ('serviceWorker' in navigator) {
 
     html += `<button id="pl-add-toggle" class="pl-fab" aria-label="Add Assignment">+</button>`;
 
-    root.innerHTML = html;
+    const applyDom = () => { root.innerHTML = html; };
+    if(animate && document.startViewTransition){
+      document.startViewTransition(applyDom);
+    } else {
+      applyDom();
+    }
 
     const addToggle = document.getElementById('pl-add-toggle');
     if(addToggle) addToggle.onclick = ()=>{ showForm = true; pendingFocus = 'title'; render(); };
@@ -855,6 +875,16 @@ if ('serviceWorker' in navigator) {
     }
     const cancelBtn = document.getElementById('pl-cancel');
     if(cancelBtn) cancelBtn.onclick = ()=>{ editIndex=null; showForm=false; render(); };
+
+    const modalBox = document.getElementById('pl-modal-box');
+    if(modalBox && saveBtn){
+      modalBox.addEventListener('keydown', (e)=>{
+        if(e.key==='Enter' && e.target.tagName==='INPUT'){
+          e.preventDefault();
+          saveBtn.click();
+        }
+      });
+    }
 
     document.getElementById('pl-sort').onchange = (e)=>{ sortMode=e.target.value; savePrefs(); render(); };
     document.getElementById('pl-show-completed').onchange = (e)=>{ hideDone = !e.target.checked; savePrefs(); render(); };
