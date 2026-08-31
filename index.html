@@ -118,8 +118,6 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
 #pl-app .pl-empty{text-align:center;padding:34px 10px;color:var(--pl-muted);font-size:14px;}
 #pl-app .pl-card-head{display:flex;align-items:flex-start;gap:8px;}
 #pl-app input,#pl-app select,#pl-app textarea{width:100%;box-sizing:border-box;padding:6px;margin-bottom:8px;border-radius:6px;border:1px solid var(--pl-border);background:var(--pl-input-bg);color:var(--pl-fg);font-family:inherit;font-size:16px;}
-#pl-app input,#pl-app select{height:40px;}
-#pl-app input[type="date"]{padding-top:0;padding-bottom:0;}
 #pl-app input[type="date"]::-webkit-date-and-time-value{text-align:left;font-size:16px;color:var(--pl-fg);}
 #pl-app input[type="date"]::-webkit-datetime-edit{font-size:16px;color:var(--pl-fg);}
 #pl-app input[type="date"]::-webkit-datetime-edit-text,
@@ -253,6 +251,7 @@ body, #pl-app .pl-today, #pl-app .pl-week-block, #pl-modal-box, #pl-app input, #
 #pl-dev-toolbar-panel{display:none;position:fixed;bottom:146px;right:20px;z-index:9998;background:#1e1e1e;color:#fff;border:1px solid #333;padding:15px;border-radius:8px;width:260px;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,0.5);}#pl-dev-toolbar-panel h4{margin:0 0 10px 0;color:#4da6ff;font-size:14px;}#pl-dev-toolbar-panel button{width:100%;margin:0 0 8px;padding:8px;background:#333;color:#fff;border:1px solid #555;border-radius:4px;cursor:pointer;text-align:left;}#pl-dev-toolbar-panel button:hover{background:#444;}
 #pl-modal-backdrop{position:fixed;top:0;left:0;right:0;bottom:0;background:var(--pl-backdrop);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;box-sizing:border-box;animation:pl-fade-in 0.18s ease-out;}
 #pl-modal-box{background:var(--pl-modal-bg);color:var(--pl-fg);border-radius:12px;padding:20px;max-width:420px;width:100%;max-height:90vh;overflow-y:auto;position:relative;box-shadow:0 10px 40px var(--pl-modal-shadow);animation:pl-modal-pop 0.22s cubic-bezier(.22,.9,.32,1.2);}
+#pl-modal-box input:not([type="date"]),#pl-modal-box select{padding:12px 10px;}
 @keyframes pl-fade-in{ from{ opacity:0; } to{ opacity:1; } }
 @keyframes pl-modal-pop{ from{ opacity:0; transform:scale(0.94) translateY(10px); } to{ opacity:1; transform:scale(1) translateY(0); } }
 #pl-modal-close{position:absolute;top:10px;right:14px;background:none;border:none;font-size:24px;line-height:1;color:var(--pl-muted);cursor:pointer;padding:0;margin:0;}
