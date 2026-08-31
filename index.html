@@ -776,7 +776,8 @@ if ('serviceWorker' in navigator) {
     return `<h3>${existing? 'Edit Assignment' : 'Add Assignment'}</h3>
       <input id="pl-title" placeholder="Title" value="${e.title}">
       <input id="pl-course" placeholder="Course (e.g. NT)" value="${e.course||''}">
-      <input id="pl-due" type="date" value="${e.due}" aria-label="Due date">
+      <label style="font-size:12px;color:#888;">Due Date:</label>
+      <input id="pl-due" type="date" value="${e.due}" placeholder="Due Date" aria-label="Due date">
       <input id="pl-units" type="number" placeholder="Total amount" value="${e.total}">
       <input id="pl-unitlabel" placeholder="Unit (pages, chapters, problems...)" value="${e.unit||''}">
       <textarea id="pl-notes" placeholder="Notes (optional)">${e.notes||''}</textarea>
