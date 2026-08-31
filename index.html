@@ -116,6 +116,8 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
 #pl-app .pl-empty{text-align:center;padding:34px 10px;color:var(--pl-muted);font-size:14px;}
 #pl-app .pl-card-head{display:flex;align-items:flex-start;gap:8px;}
 #pl-app input,#pl-app select,#pl-app textarea{width:100%;box-sizing:border-box;padding:6px;margin-bottom:8px;border-radius:6px;border:1px solid var(--pl-border);background:var(--pl-input-bg);color:var(--pl-fg);font-family:inherit;font-size:16px;}
+#pl-app input[type="date"]::-webkit-date-and-time-value{text-align:left;font-size:16px;}
+#pl-app input[type="date"]::-webkit-datetime-edit{font-size:16px;}
 #pl-app textarea{resize:vertical;min-height:50px;}
 #pl-app button{padding:6px 12px;border-radius:6px;border:none;background:#4f8b74;color:#fff;cursor:pointer;font-size:13px;margin-right:4px;margin-top:4px;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;touch-action:manipulation;transition:filter 0.15s ease, transform 0.1s ease;}
 #pl-app button:hover{filter:brightness(1.08);}
@@ -328,8 +330,8 @@ if ('serviceWorker' in navigator) {
   try{ courseColors = JSON.parse(localStorage.getItem(COURSE_COLORS_KEY)) || {}; }catch(e){ courseColors = {}; }
   function saveCourseColors(){ localStorage.setItem(COURSE_COLORS_KEY, JSON.stringify(courseColors)); }
 
-  // Logged only on days where nothing required is left \u2014 not just "did
-  // something" \u2014 so the streak reflects actually staying caught up.
+  // Logged only on days where nothing required is left - not just "did
+  // something" - so the streak reflects actually staying caught up.
   let dayCompleteLog = [];
   try{ dayCompleteLog = JSON.parse(localStorage.getItem(DAY_COMPLETE_LOG_KEY)) || []; }catch(e){ dayCompleteLog = []; }
   function saveDayCompleteLog(){ localStorage.setItem(DAY_COMPLETE_LOG_KEY, JSON.stringify(dayCompleteLog)); }
@@ -582,7 +584,7 @@ if ('serviceWorker' in navigator) {
   }
 
   // An item whose prerequisite was JUST completed today shouldn't immediately
-  // join Today's Targets (required or optional) \u2014 that would make it look
+  // join Today's Targets (required or optional) - that would make it look
   // like there's still more to do the same day you already made progress on
   // that chain. It surfaces normally starting tomorrow.
   function unlockedToday(it){
@@ -1071,8 +1073,8 @@ if ('serviceWorker' in navigator) {
       const idx = itemIndexMap.get(t.it);
       const idxAttr = idx!==undefined ? ` data-item-i="${idx}"` : '';
       const dueHint = subheadClass ? `<span class="pl-today-due-hint">Due ${relativeDueLabel(t.it.due)}</span>` : '';
-      const warningFlag = t.tight ? ' <span class="pl-tight-flag" title="No slack left \u2014 falling behind pushes this past its due date">\u26a0</span>' : '';
-      // Single-part assignments are binary (do it or don't) \u2014 an amount
+      const warningFlag = t.tight ? ' <span class="pl-tight-flag" title="No slack left - falling behind pushes this past its due date">\u26a0</span>' : '';
+      // Single-part assignments are binary (do it or don't) - an amount
       // badge like "1 reading" adds nothing, so only multi-part items get one.
       const amtBadge = `<span class="pl-today-amt">${t.it.total>1 ? fmt(t.amt)+' '+unitLabel(t.amt,t.unit) : capUnit(t.unit)}</span>`;
       return `<div class="pl-today-row pl-today-clickable"${idxAttr}>
@@ -1083,10 +1085,10 @@ if ('serviceWorker' in navigator) {
 
     function optionalBucketHtml(bucket){
       const headerText = bucket.pickCount
-        ? `Due ${relativeDueLabel(bucket.due)} \u2014 do ${bucket.pickCount} of these ${bucket.entries.length}`
+        ? `Due ${relativeDueLabel(bucket.due)} - do ${bucket.pickCount} of these ${bucket.entries.length}`
         : `Due ${relativeDueLabel(bucket.due)}`;
       // Pick buckets have no slack left, so they're required (green), not
-      // optional (dashed grey) \u2014 same meaning as the compact view.
+      // optional (dashed grey) - same meaning as the compact view.
       const dotClass = bucket.pickCount ? '' : 'pl-today-dot-optional';
       const rowClass = bucket.pickCount ? 'pl-today-clickable' : 'pl-today-clickable pl-today-optional';
       const rows = bucket.entries.map(e=>{
@@ -1106,7 +1108,7 @@ if ('serviceWorker' in navigator) {
     // so the condensed view surfaces it as one summary line, without spelling out
     // every option (that detail lives in the expanded view).
     function compactPickBucketHtml(bucket){
-      const headerText = `Due ${relativeDueLabel(bucket.due)} \u2014 do ${bucket.pickCount} of these ${bucket.entries.length}`;
+      const headerText = `Due ${relativeDueLabel(bucket.due)} - do ${bucket.pickCount} of these ${bucket.entries.length}`;
       const rows = bucket.entries.map(e=>{
         const idx = itemIndexMap.get(e.it);
         const idxAttr = idx!==undefined ? ` data-item-i="${idx}"` : '';
@@ -1118,7 +1120,7 @@ if ('serviceWorker' in navigator) {
       return `<div class="pl-today-group-header">${headerText}</div>` + rows;
     }
     function compactOptionalBucketHtml(bucket){
-      const headerText = `Later \u2014 due ${relativeDueLabel(bucket.due)}`;
+      const headerText = `Later - due ${relativeDueLabel(bucket.due)}`;
       const rows = bucket.entries.slice(0, 2).map(e=>{
         const idx = itemIndexMap.get(e.it);
         const idxAttr = idx!==undefined ? ` data-item-i="${idx}"` : '';
@@ -1148,8 +1150,8 @@ if ('serviceWorker' in navigator) {
     const expandedBody = (hasRequired
         ? requiredRowsHtml
         : (optionalBuckets.length
-            ? '<div class="pl-today-row"><span>You\'re all set for today \u2014 but here\'s what you can do to get ahead:</span></div>'
-            : '<div class="pl-today-row"><span>Nothing due today \u2014 you\'re caught up.</span></div>')) +
+            ? '<div class="pl-today-row"><span>You\'re all set for today - but here\'s what you can do to get ahead:</span></div>'
+            : '<div class="pl-today-row"><span>Nothing due today - you\'re caught up.</span></div>')) +
       optionalBuckets.map(b=>optionalBucketHtml(b)).join('');
 
     html = `<div class="pl-today" id="pl-today-card">
