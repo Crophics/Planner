@@ -125,13 +125,13 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
   color:var(--pl-muted);font-size:16px;pointer-events:none;
   transition:opacity 0.12s ease;
 }
-#pl-app .pl-date-wrap input:valid + .pl-date-placeholder,
-#pl-app .pl-date-wrap input:focus + .pl-date-placeholder{opacity:0;}
+#pl-app .pl-date-wrap.pl-has-date .pl-date-placeholder,
+#pl-app .pl-date-wrap:focus-within .pl-date-placeholder{opacity:0;}
 #pl-app input[type="date"]{-webkit-appearance:none;appearance:none;min-height:44px;}
-/* Hide native mm/dd/yyyy when empty so only "Due Date" shows */
-#pl-app input[type="date"]:required:invalid::-webkit-datetime-edit{color:transparent;}
-#pl-app input[type="date"]:focus::-webkit-datetime-edit{color:var(--pl-fg);}
-#pl-app input[type="date"]:valid{color:var(--pl-fg);}
+/* Hide native mm/dd/yyyy while empty; show real date when set or focused */
+#pl-app .pl-date-wrap:not(.pl-has-date) input[type="date"]{color:transparent;}
+#pl-app .pl-date-wrap.pl-has-date input[type="date"],
+#pl-app .pl-date-wrap:focus-within input[type="date"]{color:var(--pl-fg);}
 /* Hide native mm/dd/yyyy when empty so only "Due Date" shows */
 #pl-app input[type="date"]:required:invalid::-webkit-datetime-edit{color:transparent;}
 #pl-app input[type="date"]:focus::-webkit-datetime-edit{color:var(--pl-fg);}
@@ -1452,6 +1452,17 @@ if ('serviceWorker' in navigator) {
         const existing = editIndex!==null ? items[editIndex] : null;
         dependsSelect.innerHTML = dependsOptionsHtml(e.target.value, '', existing);
       });
+    }
+
+    const dueInput = document.getElementById('pl-due');
+    if(dueInput){
+      const wrap = dueInput.closest('.pl-date-wrap');
+      const syncDatePlaceholder = ()=>{
+        if(wrap) wrap.classList.toggle('pl-has-date', !!dueInput.value);
+      };
+      syncDatePlaceholder();
+      dueInput.addEventListener('input', syncDatePlaceholder);
+      dueInput.addEventListener('change', syncDatePlaceholder);
     }
 
     const saveBtn = document.getElementById('pl-save');
