@@ -43,7 +43,7 @@
   function readLocalPayload(){
     let prefs = {};
     try{ prefs = JSON.parse(localStorage.getItem('pl-prefs') || '{}'); }catch(e){}
-    const { theme, ...syncPrefs } = prefs;
+    const { theme, todayExpanded, ...syncPrefs } = prefs;
     return {
       items: JSON.parse(localStorage.getItem('pl-assignments') || '[]'),
       courseColors: JSON.parse(localStorage.getItem('pl-course-colors') || '{}'),
@@ -482,7 +482,7 @@ if ('serviceWorker' in navigator) {
     if(!window.plSync) return;
     let prefsNow = {};
     try{ prefsNow = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}'); }catch(e){}
-    const { theme: _theme, ...syncPrefs } = prefsNow;
+    const { theme: _theme, todayExpanded: _todayExpanded, ...syncPrefs } = prefsNow;
     window.plSync.push({
       items,
       courseColors,
@@ -508,7 +508,6 @@ if ('serviceWorker' in navigator) {
     if(p.sortMode !== undefined) sortMode = p.sortMode;
     if(p.hideDone !== undefined) hideDone = !!p.hideDone;
     if(p.showArchived !== undefined) showArchived = !!p.showArchived;
-    if(p.todayExpanded !== undefined) todayExpanded = !!p.todayExpanded;
     render();
   });
   let devMode = localStorage.getItem(DEV_MODE_KEY) === '1';
