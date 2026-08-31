@@ -1829,7 +1829,7 @@ if ('serviceWorker' in navigator) {
       });
     });
     root.querySelectorAll('.pl-edit').forEach(b=>b.onclick=()=>{
-      editIndex = parseInt(b.dataset.i); pendingFocus = 'title'; render();
+      editIndex = parseInt(b.dataset.i); pendingFocus = 'none'; render();
     });
     root.querySelectorAll('.pl-complete').forEach(b=>b.onclick=()=>{
       const it = items[b.dataset.i];
