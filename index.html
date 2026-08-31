@@ -51,6 +51,8 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
   #pl-app .pl-actions-row > span:first-child{flex:0 0 auto;white-space:nowrap;}
   #pl-app .pl-actions{display:flex;flex:0 1 auto;margin-left:auto;min-width:0;flex-wrap:nowrap;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;}
   #pl-app .pl-actions button{flex:0 0 auto;margin:0;padding:7px 10px;font-size:12.5px;white-space:nowrap;min-height:34px;display:inline-flex;align-items:center;}
+  #pl-app #pl-modal-close{font-size:22px;width:44px;height:44px;padding:0;display:flex;align-items:center;justify-content:center;}
+  #pl-app #pl-save{font-size:16px;padding:12px 22px;min-height:48px;}
 }
 #pl-app{max-width:640px;font-family:inherit;padding-bottom:calc(90px + env(safe-area-inset-bottom));}
 #pl-app .pl-today{background:var(--pl-today-bg);color:var(--pl-today-fg);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;}
@@ -116,6 +118,8 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
 #pl-app .pl-empty{text-align:center;padding:34px 10px;color:var(--pl-muted);font-size:14px;}
 #pl-app .pl-card-head{display:flex;align-items:flex-start;gap:8px;}
 #pl-app input,#pl-app select,#pl-app textarea{width:100%;box-sizing:border-box;padding:6px;margin-bottom:8px;border-radius:6px;border:1px solid var(--pl-border);background:var(--pl-input-bg);color:var(--pl-fg);font-family:inherit;font-size:16px;}
+#pl-app input,#pl-app select{height:40px;}
+#pl-app input[type="date"]{padding-top:0;padding-bottom:0;}
 #pl-app input[type="date"]::-webkit-date-and-time-value{text-align:left;font-size:16px;color:var(--pl-fg);}
 #pl-app input[type="date"]::-webkit-datetime-edit{font-size:16px;color:var(--pl-fg);}
 #pl-app input[type="date"]::-webkit-datetime-edit-text,
@@ -1089,7 +1093,7 @@ if ('serviceWorker' in navigator) {
 
     function optionalBucketHtml(bucket){
       const headerText = bucket.pickCount
-        ? `Due ${relativeDueLabel(bucket.due)} - do ${bucket.pickCount} of these ${bucket.entries.length}`
+        ? `Due ${relativeDueLabel(bucket.due)} - do ${bucket.pickCount} of these`
         : `Due ${relativeDueLabel(bucket.due)}`;
       // Pick buckets have no slack left, so they're required (green), not
       // optional (dashed grey) - same meaning as the compact view.
@@ -1112,7 +1116,7 @@ if ('serviceWorker' in navigator) {
     // so the condensed view surfaces it as one summary line, without spelling out
     // every option (that detail lives in the expanded view).
     function compactPickBucketHtml(bucket){
-      const headerText = `Due ${relativeDueLabel(bucket.due)} - do ${bucket.pickCount} of these ${bucket.entries.length}`;
+      const headerText = `Due ${relativeDueLabel(bucket.due)} - do ${bucket.pickCount} of these`;
       const rows = bucket.entries.map(e=>{
         const idx = itemIndexMap.get(e.it);
         const idxAttr = idx!==undefined ? ` data-item-i="${idx}"` : '';
