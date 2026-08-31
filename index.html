@@ -125,6 +125,11 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
 #pl-app input[type="date"]::-webkit-datetime-edit-month-field,
 #pl-app input[type="date"]::-webkit-datetime-edit-day-field,
 #pl-app input[type="date"]::-webkit-datetime-edit-year-field{color:var(--pl-fg);}
+/* Empty date: hide native edit text so placeholder "Due Date" shows inside the box */
+#pl-app input[type="date"]:required:invalid::-webkit-datetime-edit{color:transparent;}
+#pl-app input[type="date"]:focus::-webkit-datetime-edit{color:var(--pl-fg);}
+#pl-app input[type="date"]:required:invalid{color:var(--pl-muted);}
+#pl-app input[type="date"]:valid{color:var(--pl-fg);}
 #pl-app textarea{resize:vertical;min-height:50px;}
 #pl-app button{padding:6px 12px;border-radius:6px;border:none;background:#4f8b74;color:#fff;cursor:pointer;font-size:13px;margin-right:4px;margin-top:4px;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;touch-action:manipulation;transition:filter 0.15s ease, transform 0.1s ease;}
 #pl-app button:hover{filter:brightness(1.08);}
@@ -776,8 +781,7 @@ if ('serviceWorker' in navigator) {
     return `<h3>${existing? 'Edit Assignment' : 'Add Assignment'}</h3>
       <input id="pl-title" placeholder="Title" value="${e.title}">
       <input id="pl-course" placeholder="Course (e.g. NT)" value="${e.course||''}">
-      <label style="font-size:12px;color:#888;">Due Date:</label>
-      <input id="pl-due" type="date" value="${e.due}" placeholder="Due Date" aria-label="Due date">
+      <input id="pl-due" type="date" value="${e.due}" placeholder="Due Date" required aria-label="Due date">
       <input id="pl-units" type="number" placeholder="Total amount" value="${e.total}">
       <input id="pl-unitlabel" placeholder="Unit (pages, chapters, problems...)" value="${e.unit||''}">
       <textarea id="pl-notes" placeholder="Notes (optional)">${e.notes||''}</textarea>
