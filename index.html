@@ -876,8 +876,7 @@ if ('serviceWorker' in navigator) {
       <select id="pl-depends">
         ${dependsOptionsHtml(e.course, e.dependsOn, existing)}
       </select>
-      <button id="pl-save">${existing? 'Save Changes' : 'Add'}</button>
-      ${existing? '<button id="pl-cancel" class="pl-secondary">Cancel</button>' : ''}`;
+      <button id="pl-save">${existing? 'Save Changes' : 'Add'}</button>`;
   }
 
   function exportData(){
@@ -1491,7 +1490,7 @@ if ('serviceWorker' in navigator) {
     pendingTodayAnim = false;
 
     const addToggle = document.getElementById('pl-add-toggle');
-    if(addToggle) addToggle.onclick = ()=>{ showForm = true; pendingFocus = 'title'; render(); };
+    if(addToggle) addToggle.onclick = ()=>{ showForm = true; render(); };
 
     const modalBackdrop = document.getElementById('pl-modal-backdrop');
     if(modalBackdrop){
