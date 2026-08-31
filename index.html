@@ -29,6 +29,7 @@
   let currentUser = null;
   let unsubSnapshot = null;
   let applyingRemote = false;
+  let lastPushedAt = null;
 
   window.plSync = {
     signIn: () => signInWithPopup(auth, provider),
@@ -36,7 +37,9 @@
     getUser: () => currentUser,
     push: async (payload) => {
       if(!currentUser || applyingRemote) return;
-      await setDoc(doc(db, 'users', currentUser.uid, 'planner', 'data'), { ...payload, updatedAt: Date.now() });
+      const updatedAt = Date.now();
+      lastPushedAt = updatedAt;
+      await setDoc(doc(db, 'users', currentUser.uid, 'planner', 'data'), { ...payload, updatedAt });
     }
   };
 
@@ -82,7 +85,14 @@
 
     unsubSnapshot = onSnapshot(ref, (docSnap) => {
       if(!docSnap.exists()) return;
-      writeLocalPayload(docSnap.data());
+      const data = docSnap.data();
+      // This fires for our own writes too (Firestore echoes them back through
+      // the same listener) - applying and re-rendering on that echo is at
+      // best redundant and at worst clobbers whatever's mid-animation (e.g.
+      // the today panel's open/close transition) with an instant DOM swap.
+      // Skip snapshots that are just our own last push coming back.
+      if(data.updatedAt!==undefined && data.updatedAt===lastPushedAt) return;
+      writeLocalPayload(data);
       document.dispatchEvent(new CustomEvent('pl-remote-data', {}));
     });
   });
