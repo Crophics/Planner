@@ -563,6 +563,9 @@ if ('serviceWorker' in navigator) {
     if(d<=-2 && d>=-6) return Math.abs(d)+'d ago';
     return asDate(dateStr).toLocaleDateString(undefined,{month:'short', day:'numeric'});
   }
+  function fullDateLabel(dateStr){
+    return asDate(dateStr).toLocaleDateString(undefined,{month:'short', day:'numeric', year:'numeric'});
+  }
   function urgencyClass(daysLeft, completed){
     if(completed) return '';
     if(daysLeft<0) return 'pl-overdue';
@@ -772,7 +775,8 @@ if ('serviceWorker' in navigator) {
     return `<h3>${existing? 'Edit Assignment' : 'Add Assignment'}</h3>
       <input id="pl-title" placeholder="Title" value="${e.title}">
       <input id="pl-course" placeholder="Course (e.g. NT)" value="${e.course||''}">
-      <input id="pl-due" type="date" value="${e.due}">
+      <div id="pl-due-display" class="pl-date-field ${e.due? '' : 'pl-date-placeholder'}" tabindex="0" role="button" aria-label="Due date">${e.due? fullDateLabel(e.due) : 'Due date'}</div>
+      <input id="pl-due" type="date" value="${e.due}" class="pl-date-input-hidden">
       <input id="pl-units" type="number" placeholder="Total amount" value="${e.total}">
       <input id="pl-unitlabel" placeholder="Unit (pages, chapters, problems...)" value="${e.unit||''}">
       <textarea id="pl-notes" placeholder="Notes (optional)">${e.notes||''}</textarea>
