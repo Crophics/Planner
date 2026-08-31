@@ -118,11 +118,47 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
 #pl-app .pl-empty{text-align:center;padding:34px 10px;color:var(--pl-muted);font-size:14px;}
 #pl-app .pl-card-head{display:flex;align-items:flex-start;gap:8px;}
 #pl-app input,#pl-app select,#pl-app textarea{width:100%;box-sizing:border-box;padding:6px;margin-bottom:8px;border-radius:6px;border:1px solid var(--pl-border);background:var(--pl-input-bg);color:var(--pl-fg);font-family:inherit;font-size:16px;}
-#pl-app .pl-date-wrap{position:relative;margin-bottom:8px;}
-#pl-app .pl-date-wrap input[type="date"]{margin-bottom:0;width:100%;}
+#pl-modal-box input,
+#pl-modal-box select,
+#pl-modal-box textarea{
+  padding:12px 10px;
+  margin-bottom:10px;
+}
+#pl-modal-box #pl-subtasks{
+  margin-bottom:4px;
+}
+#pl-modal-box input[type="date"]{
+  width:100% !important;
+  max-width:100% !important;
+  box-sizing:border-box !important;
+  margin-left:0 !important;
+  margin-right:0 !important;
+  min-height:48px;
+}
+#pl-modal-box .pl-date-wrap{
+  position:relative;
+  margin-bottom:10px;
+}
+#pl-modal-box .pl-date-wrap input[type="date"]{
+  margin-bottom:0;
+  width:100%;
+}
+#pl-modal-box label{
+  display:block;
+  margin:0 0 4px;
+  font-size:12px;
+  color:#888;
+}
+#pl-modal-box input::placeholder,
+#pl-modal-box textarea::placeholder{
+  color:var(--pl-muted);
+  opacity:1;
+}
 #pl-app .pl-date-placeholder{
-  position:absolute;left:12px;top:50%;transform:translateY(-50%);
-  color:var(--pl-muted);font-size:16px;pointer-events:none;
+  position:absolute;left:10px;top:0;bottom:0;
+  display:flex;align-items:center;
+  color:var(--pl-muted);font-size:16px;font-family:inherit;line-height:normal;
+  pointer-events:none;opacity:1;
   transition:opacity 0.12s ease;
 }
 #pl-app .pl-date-wrap.pl-has-date .pl-date-placeholder,
@@ -150,6 +186,8 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
 #pl-app button:disabled{opacity:0.35;cursor:not-allowed;filter:none;transform:none;}
 #pl-app button:focus-visible,#pl-app input:focus-visible,#pl-app select:focus-visible,#pl-app textarea:focus-visible{outline:2px solid #2ea9dd;outline-offset:2px;}
 #pl-app input.pl-field-error{border-color:#d94535;animation:pl-field-shake 0.3s ease;}
+#pl-app .pl-date-wrap.pl-field-error{animation:pl-field-shake 0.3s ease;}
+#pl-app .pl-date-wrap.pl-field-error input{border-color:#d94535;animation:none;}
 @keyframes pl-field-shake{
   0%,100%{ transform:translateX(0); }
   25%{ transform:translateX(-4px); }
@@ -270,8 +308,34 @@ body, #pl-app .pl-today, #pl-app .pl-week-block, #pl-modal-box, #pl-app input, #
 #pl-dev-toolbar-panel{display:none;position:fixed;bottom:146px;right:20px;z-index:9998;background:#1e1e1e;color:#fff;border:1px solid #333;padding:15px;border-radius:8px;width:260px;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,0.5);}#pl-dev-toolbar-panel h4{margin:0 0 10px 0;color:#4da6ff;font-size:14px;}#pl-dev-toolbar-panel button{width:100%;margin:0 0 8px;padding:8px;background:#333;color:#fff;border:1px solid #555;border-radius:4px;cursor:pointer;text-align:left;}#pl-dev-toolbar-panel button:hover{background:#444;}
 #pl-modal-backdrop{position:fixed;top:0;left:0;right:0;bottom:0;background:var(--pl-backdrop);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;box-sizing:border-box;animation:pl-fade-in 0.18s ease-out;}
 #pl-modal-box{background:var(--pl-modal-bg);color:var(--pl-fg);border-radius:12px;padding:20px;max-width:420px;width:100%;max-height:90vh;overflow-y:auto;position:relative;box-shadow:0 10px 40px var(--pl-modal-shadow);animation:pl-modal-pop 0.22s cubic-bezier(.22,.9,.32,1.2);}
-#pl-modal-box input,#pl-modal-box select{padding:12px 10px;}
-#pl-modal-box input[type="date"]{width:100% !important;max-width:100% !important;box-sizing:border-box !important;margin-left:0 !important;margin-right:0 !important;min-height:48px;}
+#pl-modal-box input,
+#pl-modal-box select,
+#pl-modal-box textarea{
+  padding:12px 10px;
+  margin-bottom:10px;
+}
+#pl-modal-box input[type="date"]{
+  width:100% !important;
+  max-width:100% !important;
+  box-sizing:border-box !important;
+  margin-left:0 !important;
+  margin-right:0 !important;
+  min-height:48px;
+}
+#pl-modal-box .pl-date-wrap{
+  position:relative;
+  margin-bottom:10px;
+}
+#pl-modal-box .pl-date-wrap input[type="date"]{
+  margin-bottom:0;
+  width:100%;
+}
+#pl-modal-box label{
+  display:block;
+  margin:0 0 4px;
+  font-size:12px;
+  color:#888;
+}
 @keyframes pl-fade-in{ from{ opacity:0; } to{ opacity:1; } }
 @keyframes pl-modal-pop{ from{ opacity:0; transform:scale(0.94) translateY(10px); } to{ opacity:1; transform:scale(1) translateY(0); } }
 #pl-modal-close{position:absolute;top:10px;right:14px;background:none;border:none;font-size:24px;line-height:1;color:var(--pl-muted);cursor:pointer;padding:0;margin:0;}
@@ -802,13 +866,13 @@ if ('serviceWorker' in navigator) {
       <input id="pl-unitlabel" placeholder="Unit (pages, chapters, problems...)" value="${e.unit||''}">
       <textarea id="pl-notes" placeholder="Notes (optional)">${e.notes||''}</textarea>
       <textarea id="pl-subtasks" placeholder="Subtasks, one per line (optional)">${(e.subtasks||[]).map(s=>s.text).join('\n')}</textarea>
-      <label style="font-size:12px;color:#888;">Repeat:</label>
+      <label>Repeat:</label>
       <select id="pl-recurring">
         <option value="" ${!e.recurring?'selected':''}>Does not repeat</option>
         <option value="weekly" ${e.recurring==='weekly'?'selected':''}>Weekly</option>
         <option value="monthly" ${e.recurring==='monthly'?'selected':''}>Monthly</option>
       </select>
-      <label style="font-size:12px;color:#888;">Do this after (same course only):</label>
+      <label>Do this after (same course only):</label>
       <select id="pl-depends">
         ${dependsOptionsHtml(e.course, e.dependsOn, existing)}
       </select>
@@ -1480,12 +1544,17 @@ if ('serviceWorker' in navigator) {
         const subtaskLines = document.getElementById('pl-subtasks').value.split('\n').map(s=>s.trim()).filter(Boolean);
         const titleEl = document.getElementById('pl-title');
         const dueEl = document.getElementById('pl-due');
-        [titleEl,dueEl].forEach(el=>el.classList.remove('pl-field-error'));
+        const dueWrap = dueEl ? dueEl.closest('.pl-date-wrap') : null;
+        [titleEl,dueEl].forEach(el=>{ if(el) el.classList.remove('pl-field-error'); });
+        if(dueWrap) dueWrap.classList.remove('pl-field-error');
         const missing = [];
         if(!title) missing.push(titleEl);
         if(!due) missing.push(dueEl);
         if(missing.length){
-          missing.forEach(el=>el.classList.add('pl-field-error'));
+          missing.forEach(el=>{
+            if(el === dueEl && dueWrap) dueWrap.classList.add('pl-field-error');
+            else el.classList.add('pl-field-error');
+          });
           missing[0].focus();
           return;
         }
