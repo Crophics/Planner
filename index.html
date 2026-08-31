@@ -61,7 +61,8 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
 #pl-app .pl-today-toggle-btn:hover{opacity:1;filter:none;background:rgba(255,255,255,0.08);}
 #pl-app .pl-today .pl-today-row{display:flex;justify-content:space-between;align-items:center;margin-top:7px;gap:10px;}
 #pl-app .pl-today-title{display:flex;align-items:center;gap:8px;min-width:0;}
-#pl-app .pl-today-title span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#pl-app .pl-today-title-main{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#pl-app .pl-today-title-col{display:flex;flex-direction:column;min-width:0;flex:1 1 auto;gap:1px;}
 #pl-app .pl-today-dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto;background:#4f8b74;}
 #pl-app .pl-today-dot-tight{background:#e2604e;}
 #pl-app .pl-today-dot-optional{background:transparent;border:1.5px dashed currentColor;opacity:0.65;}
@@ -79,15 +80,12 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
   100%{ box-shadow:0 0 0 0 rgba(79,139,116,0); }
 }
 #pl-app .pl-tight-flag{color:#e2604e;font-size:11px;}
-#pl-app .pl-today-due-hint{color:var(--pl-muted);font-size:10.5px;font-weight:400;flex:0 0 auto;}
+#pl-app .pl-today-due-hint{color:var(--pl-muted);font-size:10.5px;font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 #pl-app .pl-today{cursor:pointer;}
 #pl-app .pl-today-body-anim{overflow:hidden;position:relative;}
 #pl-app .pl-today-body-overlay{position:absolute;top:0;left:0;right:0;transition:opacity 0.3s ease;}
 #pl-app .pl-today-arrow{display:inline-block;font-size:15px;line-height:1;transition:transform 0.3s cubic-bezier(.4,0,.2,1);}
 #pl-app .pl-today-arrow-open{transform:rotate(90deg);}
-@media (max-width: 600px){
-  #pl-app .pl-today-title span:first-child{max-width:150px;}
-}
 #pl-app .pl-week-block{background:var(--pl-card-bg);border-radius:10px;padding:10px 12px 12px;margin-bottom:14px;}
 #pl-app .pl-summary{font-size:12.5px;color:var(--pl-muted);margin-bottom:8px;}
 #pl-app .pl-streak-banner{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;padding:10px 12px;border-radius:10px;background:var(--pl-card-bg);color:var(--pl-fg);}
@@ -1072,12 +1070,13 @@ if ('serviceWorker' in navigator) {
       const dotClass = t.tight ? 'pl-today-dot-tight' : '';
       const idx = itemIndexMap.get(t.it);
       const idxAttr = idx!==undefined ? ` data-item-i="${idx}"` : '';
-      const dueHint = subheadClass ? ` <span class="pl-today-due-hint">\u00b7 due ${relativeDueLabel(t.it.due)}</span>` : '';
+      const dueHint = subheadClass ? `<span class="pl-today-due-hint">Due ${relativeDueLabel(t.it.due)}</span>` : '';
+      const warningFlag = t.tight ? ' <span class="pl-tight-flag" title="No slack left \u2014 falling behind pushes this past its due date">\u26a0</span>' : '';
       // Single-part assignments are binary (do it or don't) \u2014 an amount
       // badge like "1 reading" adds nothing, so only multi-part items get one.
       const amtBadge = `<span class="pl-today-amt">${t.it.total>1 ? fmt(t.amt)+' '+unitLabel(t.amt,t.unit) : capUnit(t.unit)}</span>`;
       return `<div class="pl-today-row pl-today-clickable"${idxAttr}>
-        <span class="pl-today-title"><span class="pl-today-dot ${dotClass}"></span><span>${t.title}</span>${dueHint}${t.tight?' <span class="pl-tight-flag" title="No slack left \u2014 falling behind pushes this past its due date">\u26a0</span>':''}</span>
+        <span class="pl-today-title"><span class="pl-today-dot ${dotClass}"></span><span class="pl-today-title-col"><span class="pl-today-title-main">${t.title}${warningFlag}</span>${dueHint}</span></span>
         ${amtBadge}
       </div>`;
     }
@@ -1095,7 +1094,7 @@ if ('serviceWorker' in navigator) {
         const idxAttr = idx!==undefined ? ` data-item-i="${idx}"` : '';
         const amtBadge = `<span class="pl-today-amt">${e.kind==='multi' ? fmt(e.amt)+' '+unitLabel(e.amt,e.unit) : capUnit(e.unit)}</span>`;
         return `<div class="pl-today-row ${rowClass}"${idxAttr}>
-          <span class="pl-today-title"><span class="pl-today-dot ${dotClass}"></span><span>${e.title}</span></span>
+          <span class="pl-today-title"><span class="pl-today-dot ${dotClass}"></span><span class="pl-today-title-main">${e.title}</span></span>
           ${amtBadge}
         </div>`;
       }).join('');
@@ -1112,7 +1111,7 @@ if ('serviceWorker' in navigator) {
         const idx = itemIndexMap.get(e.it);
         const idxAttr = idx!==undefined ? ` data-item-i="${idx}"` : '';
         return `<div class="pl-today-row pl-today-clickable"${idxAttr}>
-          <span class="pl-today-title"><span class="pl-today-dot"></span><span>${e.title}</span></span>
+          <span class="pl-today-title"><span class="pl-today-dot"></span><span class="pl-today-title-main">${e.title}</span></span>
           <span class="pl-today-amt">${capUnit(e.unit)}</span>
         </div>`;
       }).join('');
@@ -1124,11 +1123,11 @@ if ('serviceWorker' in navigator) {
         const idx = itemIndexMap.get(e.it);
         const idxAttr = idx!==undefined ? ` data-item-i="${idx}"` : '';
         return `<div class="pl-today-row pl-today-clickable pl-today-optional"${idxAttr}>
-          <span class="pl-today-title"><span class="pl-today-dot pl-today-dot-optional"></span><span>${e.title}</span></span>
+          <span class="pl-today-title"><span class="pl-today-dot pl-today-dot-optional"></span><span class="pl-today-title-main">${e.title}</span></span>
           <span class="pl-today-amt">${capUnit(e.unit)}</span>
         </div>`;
       }).join('');
-      const more = bucket.entries.length > 2 ? `<div class="pl-today-row pl-today-optional"><span class="pl-today-title"><span class="pl-today-dot pl-today-dot-optional"></span><span>+${bucket.entries.length - 2} more</span></span></div>` : '';
+      const more = bucket.entries.length > 2 ? `<div class="pl-today-row pl-today-optional"><span class="pl-today-title"><span class="pl-today-dot pl-today-dot-optional"></span><span class="pl-today-title-main">+${bucket.entries.length - 2} more</span></span></div>` : '';
       return `<div class="pl-today-group-header">${headerText}</div>` + rows + more;
     }
 
