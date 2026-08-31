@@ -310,6 +310,7 @@ if ('serviceWorker' in navigator) {
   let pendingScrollId = null;
   let pendingScrollAlign = 'end';
   let pendingTodayAnim = false;
+  let weekChartAnimated = false;
   let overdueFilterActive = false;
   let dragSrcIndex = null;
   let celebrationPending = null;
@@ -877,6 +878,99 @@ if ('serviceWorker' in navigator) {
     localStorage.setItem('pl-streak-banner-seen-date', today());
   }
 
+  // Computes which items are "required today" (multi-part items that still need
+  // progress logged today to stay on pace, plus singles due today/overdue), plus
+  // the optional/credit-eligible buckets and whether today counts as fully done.
+  // Pulled out of render() so click handlers can call it too, to check whether
+  // an action just completed the whole day (-> big confetti) rather than just
+  // one item (-> small confetti).
+  function computeTodayPanel(){
+    const active = items.filter(x=>!x.completed && !x.archived && !isLocked(x) && !unlockedToday(x));
+    const multi = active.filter(it=>it.total>1);
+    const singles = active.filter(it=>it.total<=1 && it.done<it.total);
+
+    let dailyTargetsChanged = false;
+    multi.forEach(it=>{
+      const t = today();
+      const dt = it.dailyTarget;
+      if(!dt || dt.date!==t || dt.total!==it.total || dt.due!==it.due){
+        const left = Math.max(it.total-it.done,0);
+        const daysLeft = Math.max(daysBetween(t, it.due),1);
+        it.dailyTarget = {
+          date: t, startDone: it.done, total: it.total, due: it.due,
+          amt: left>0? Math.ceil(left/daysLeft) : 0
+        };
+        dailyTargetsChanged = true;
+      }
+    });
+    if(dailyTargetsChanged) localStorage.setItem(KEY, JSON.stringify(items));
+
+    const multiTargets = multi.map(it=>{
+      const left = Math.max(it.total-it.done,0);
+      const daysLeft = Math.max(daysBetween(today(), it.due),1);
+      const progressToday = Math.max(it.done - it.dailyTarget.startDone, 0);
+      const remainingToday = Math.max(it.dailyTarget.amt - progressToday, 0);
+      return {
+        it, title:it.title, unit:it.unit||'units',
+        amt: remainingToday,
+        tight: it.due<=today(),
+        noSlack: left>=daysLeft
+      };
+    }).filter(t=>t.amt>0);
+
+    const requiredTight = multiTargets.filter(t=>t.noSlack && t.tight)
+      .concat(singles.filter(it=>daysBetween(today(), it.due)<=0)
+        .map(it=>({it, title:it.title, unit:it.unit||'reading', amt:1, tight:true})))
+      .sort((a,b)=> a.it.due.localeCompare(b.it.due));
+    const requiredPace = multiTargets.filter(t=>t.noSlack && !t.tight)
+      .sort((a,b)=> a.it.due.localeCompare(b.it.due));
+
+    const requiredItemsSet = new Set([...requiredTight.map(t=>t.it), ...requiredPace.map(t=>t.it)]);
+    const optionalByDue = new Map();
+    function addOptional(due, entry){
+      if(!optionalByDue.has(due)) optionalByDue.set(due, []);
+      optionalByDue.get(due).push(entry);
+    }
+    multiTargets.filter(t=>!t.noSlack).forEach(t=>{
+      addOptional(t.it.due, {kind:'multi', it:t.it, title:t.title, unit:t.unit, amt:t.amt});
+    });
+    singles.forEach(it=>{
+      if(!requiredItemsSet.has(it)){
+        const d = daysBetween(today(), it.due);
+        if(d>=0) addOptional(it.due, {kind:'single', it, title:it.title, unit:it.unit||'reading'});
+      }
+    });
+    const optionalBuckets = [...optionalByDue.entries()]
+      .sort((a,b)=> a[0].localeCompare(b[0]))
+      .map(([due, entries])=>{
+        const singleCount = entries.filter(e=>e.kind==='single').length;
+        const daysAvailable = Math.max(daysBetween(today(), due), 1);
+        const pickCount = (singleCount>1 && singleCount===entries.length && singleCount>=daysAvailable)
+          ? Math.ceil(singleCount/daysAvailable) : null;
+        return {due, entries, pickCount};
+      });
+
+    const hasRequired = requiredTight.length || requiredPace.length;
+    const pickBuckets = optionalBuckets.filter(b=>b.pickCount);
+    const hasPriorAssignmentWork = items.some(it => !it.completed && !it.archived && (it.createdAt ? it.createdAt < today() : it.due < today()));
+    // Matches the "You're all set for today" state shown in the Today panel:
+    // nothing required, no must-pick optional buckets, and there was actually
+    // something to do today in the first place (so an empty planner doesn't
+    // read as "day complete").
+    const allDoneToday = !hasRequired && pickBuckets.length===0 && hasPriorAssignmentWork;
+
+    return {active, multi, singles, multiTargets, requiredTight, requiredPace, optionalBuckets, hasRequired, pickBuckets, hasPriorAssignmentWork, allDoneToday};
+  }
+  // "Is there still required or must-pick work today" — used to detect the
+  // completion click that clears it out (-> big confetti). Deliberately
+  // skips the hasPriorAssignmentWork gate baked into allDoneToday (that gate
+  // exists only so an empty planner doesn't log a false streak day; it would
+  // otherwise block confetti for anything added today).
+  function hasTodayWorkRemaining(){
+    const {hasRequired, pickBuckets} = computeTodayPanel();
+    return hasRequired || pickBuckets.length>0;
+  }
+
   function render(){
     currentColorMap = computeCourseColorMap();
 
@@ -905,10 +999,11 @@ if ('serviceWorker' in navigator) {
     const totalCompleted = items.filter(i=>i.completed).length;
     const thisWeek = completedThisWeek();
     const streak = currentStreak();
-    const streakText = streak > 0 ? `${streak}-day streak 🔥` : `0-day streak 🔥`;
-    const summaryText = `${totalActive} active \u00b7 ${totalCompleted} completed${streak>0? ' \u00b7 '+streakText : ' \u00b7 '+streakText}`;
+    const streakText = streak > 0 ? `${streak}-day streak 🔥` : '';
+    const summaryText = `${totalActive} active \u00b7 ${totalCompleted} completed${streak>0? ' \u00b7 '+streakText : ''}`;
 
-    html += weekChartHtml(summaryText, !pendingTodayAnim);
+    html += weekChartHtml(summaryText, !weekChartAnimated);
+    weekChartAnimated = true;
 
     const streakNotice = getDailyStreakNotice();
     if(streakNotice){
@@ -948,100 +1043,7 @@ if ('serviceWorker' in navigator) {
       return daysBetween(today(),a.it.due) - daysBetween(today(),b.it.due);
     });
 
-    const active = items.filter(x=>!x.completed && !x.archived && !isLocked(x) && !unlockedToday(x));
-    const multi = active.filter(it=>it.total>1);
-    const singles = active.filter(it=>it.total<=1 && it.done<it.total);
-
-    // Each multi-part item's daily target is locked in once per day (a snapshot
-    // of "how much left, how much done so far today") so that logging progress
-    // counts DOWN toward finishing today's target, instead of the target itself
-    // shrinking to match — which made it impossible to ever hit "done for today"
-    // short of finishing the whole assignment. Recomputed if the day rolls over
-    // or the assignment's total/due date changes (edited mid-day).
-    let dailyTargetsChanged = false;
-    multi.forEach(it=>{
-      const t = today();
-      const dt = it.dailyTarget;
-      if(!dt || dt.date!==t || dt.total!==it.total || dt.due!==it.due){
-        const left = Math.max(it.total-it.done,0);
-        const daysLeft = Math.max(daysBetween(t, it.due),1);
-        it.dailyTarget = {
-          date: t, startDone: it.done, total: it.total, due: it.due,
-          amt: left>0? Math.ceil(left/daysLeft) : 0
-        };
-        dailyTargetsChanged = true;
-      }
-    });
-    if(dailyTargetsChanged) localStorage.setItem(KEY, JSON.stringify(items));
-
-    // Multi-part items only need partial progress *today* when there's no slack left
-    // in the schedule — i.e. the segments remaining are >= the days remaining, so
-    // every remaining day has to be used to finish on time. With more days than
-    // segments left (e.g. 2 chapters due in 5 days), there's room to start later,
-    // so it's credit-eligible today rather than required. `tight` (red dot) is the
-    // sharper case: due today or overdue, where there's truly zero room left.
-    const multiTargets = multi.map(it=>{
-      const left = Math.max(it.total-it.done,0);
-      const daysLeft = Math.max(daysBetween(today(), it.due),1);
-      const progressToday = Math.max(it.done - it.dailyTarget.startDone, 0);
-      const remainingToday = Math.max(it.dailyTarget.amt - progressToday, 0);
-      return {
-        it, title:it.title, unit:it.unit||'units',
-        amt: remainingToday,
-        tight: it.due<=today(),
-        noSlack: left>=daysLeft
-      };
-    }).filter(t=>t.amt>0);
-
-    // ---- Required today: split into two clearly labeled tiers ----
-    // Tight (red): due today or overdue — zero slack left, no framing needed beyond that.
-    // Pace (green): multi-part items with no slack in the days-remaining sense, but
-    // whose actual due date is later — grouped under a "keep pace" sub-heading so
-    // it's obvious why they're required despite not being due today.
-    const requiredTight = multiTargets.filter(t=>t.noSlack && t.tight)
-      .concat(singles.filter(it=>daysBetween(today(), it.due)<=0)
-        .map(it=>({it, title:it.title, unit:it.unit||'reading', amt:1, tight:true})))
-      .sort((a,b)=> a.it.due.localeCompare(b.it.due));
-    const requiredPace = multiTargets.filter(t=>t.noSlack && !t.tight)
-      .sort((a,b)=> a.it.due.localeCompare(b.it.due));
-
-    // ---- Optional today: bucket every credit-eligible item by its due date ----
-    // One header per due date, covering every item under it — no more mixing items
-    // from different due dates under a single ambiguous header, and no more
-    // per-row "due X" clutter since the bucket header already says it.
-    const optionalByDue = new Map();
-    function addOptional(due, entry){
-      if(!optionalByDue.has(due)) optionalByDue.set(due, []);
-      optionalByDue.get(due).push(entry);
-    }
-    // Build a set of items already required (tight or pace) so optionals don't duplicate them
-    const requiredItemsSet = new Set([...requiredTight.map(t=>t.it), ...requiredPace.map(t=>t.it)]);
-    
-    multiTargets.filter(t=>!t.noSlack).forEach(t=>{
-      addOptional(t.it.due, {kind:'multi', it:t.it, title:t.title, unit:t.unit, amt:t.amt});
-    });
-    singles.forEach(it=>{
-      if(!requiredItemsSet.has(it)){
-        const d = daysBetween(today(), it.due);
-        if(d>=0) addOptional(it.due, {kind:'single', it, title:it.title, unit:it.unit||'reading'});
-      }
-    });
-    const optionalBuckets = [...optionalByDue.entries()]
-      .sort((a,b)=> a[0].localeCompare(b[0]))
-      .map(([due, entries])=>{
-        const singleCount = entries.filter(e=>e.kind==='single').length;
-        // Days available to spread work across BEFORE the due date arrives
-        // (today, tomorrow, ...) — the due date itself isn't counted here since
-        // items due today already land in requiredTight, not this bucket.
-        const daysAvailable = Math.max(daysBetween(today(), due), 1);
-        // "Pick N of M" only makes sense when the whole bucket is all-or-nothing
-        // singles; a bucket containing a multi-part item can't be reduced that way.
-        // It's only a *required-today* pace item when there's no slack left —
-        // i.e. items left >= days available to spread them across.
-        const pickCount = (singleCount>1 && singleCount===entries.length && singleCount>=daysAvailable)
-          ? Math.ceil(singleCount/daysAvailable) : null;
-        return {due, entries, pickCount};
-      });
+    const {active, multi, singles, multiTargets, requiredTight, requiredPace, optionalBuckets, hasRequired, pickBuckets, hasPriorAssignmentWork, allDoneToday} = computeTodayPanel();
 
     const itemIndexMap = new Map(items.map((it,idx)=>[it, idx]));
 
@@ -1109,17 +1111,13 @@ if ('serviceWorker' in navigator) {
       return `<div class="pl-today-group-header">${headerText}</div>` + rows + more;
     }
 
-    const hasRequired = requiredTight.length || requiredPace.length;
-    const pickBuckets = optionalBuckets.filter(b=>b.pickCount);
     const laterBuckets = optionalBuckets.filter(b=>!b.pickCount);
     const requiredItemSet = new Set([
       ...requiredTight.map(t => t.it),
       ...requiredPace.map(t => t.it),
       ...pickBuckets.flatMap(bucket => bucket.entries.map(e => e.it))
     ]);
-    const hasPriorAssignmentWork = items.some(it => !it.completed && !it.archived && (it.createdAt ? it.createdAt < today() : it.due < today()));
-    const allRequiredDoneToday = !hasRequired && pickBuckets.length===0 && hasPriorAssignmentWork;
-    if(allRequiredDoneToday) logDayComplete();
+    if(allDoneToday) logDayComplete();
     const requiredRowsHtml = requiredTight.map(t=>requiredRowHtml(t,false)).join('') + requiredPace.map(t=>requiredRowHtml(t,true)).join('');
 
     const compactHasAnything = hasRequired || pickBuckets.length;
@@ -1409,7 +1407,7 @@ if ('serviceWorker' in navigator) {
         const due = document.getElementById('pl-due').value;
         const unitsRaw = document.getElementById('pl-units').value.trim();
         const total = unitsRaw ? parseFloat(unitsRaw) : 1;
-        const unit = document.getElementById('pl-unitlabel').value.trim() || 'units';
+        const unit = document.getElementById('pl-unitlabel').value.trim() || 'Assignment';
         const notes = document.getElementById('pl-notes').value.trim();
         const dependsOn = document.getElementById('pl-depends').value;
         const recurring = document.getElementById('pl-recurring').value;
@@ -1625,15 +1623,22 @@ if ('serviceWorker' in navigator) {
 
     root.querySelectorAll('.pl-log').forEach(b=>b.onclick=()=>{
       const it = items[b.dataset.i];
+      const workBefore = hasTodayWorkRemaining();
+      const dt = it.dailyTarget;
+      const progressBeforeToday = dt ? Math.max(it.done - dt.startDone, 0) : 0;
       it.done = Math.min(it.done+1, it.total);
-      const hadActiveItemsBefore = items.some(x=>!x.completed && !x.archived);
-      if(it.done>=it.total && !it.completed){
+      const progressAfterToday = dt ? Math.max(it.done - dt.startDone, 0) : 0;
+      const reachedDailyTarget = !!dt && dt.amt>0 && progressBeforeToday < dt.amt && progressAfterToday >= dt.amt;
+      const fullyCompleted = it.done>=it.total && !it.completed;
+      if(fullyCompleted){
         it.completed = true;
         it.completedAt = today();
         if(it.recurring) items.push(makeRecurringClone(it));
+      }
+      if(fullyCompleted || reachedDailyTarget){
         const rect = b.getBoundingClientRect();
-        const remainingAfter = items.filter(x=>!x.completed && !x.archived).length;
-        if(remainingAfter===0 && hadActiveItemsBefore){
+        const workAfter = hasTodayWorkRemaining();
+        if(workBefore && !workAfter){
           triggerCelebration(window.innerWidth/2, window.innerHeight*0.25, true);
         } else {
           triggerCelebration(rect.left + rect.width/2, rect.top + rect.height/2, false);
@@ -1695,7 +1700,7 @@ if ('serviceWorker' in navigator) {
     root.querySelectorAll('.pl-complete').forEach(b=>b.onclick=()=>{
       const it = items[b.dataset.i];
       const completing = !it.completed;
-      const hadActiveItemsBefore = items.some(x=>!x.completed && !x.archived);
+      const workBefore = hasTodayWorkRemaining();
       it.completed = !it.completed;
       if(it.completed){
         it.done = it.total;
@@ -1707,8 +1712,8 @@ if ('serviceWorker' in navigator) {
       }
       if(completing){
         const rect = b.getBoundingClientRect();
-        const remainingAfter = items.filter(x=>!x.completed && !x.archived).length;
-        if(remainingAfter===0 && hadActiveItemsBefore){
+        const workAfter = hasTodayWorkRemaining();
+        if(workBefore && !workAfter){
           triggerCelebration(window.innerWidth/2, window.innerHeight*0.25, true);
         } else {
           triggerCelebration(rect.left + rect.width/2, rect.top + rect.height/2, false);
