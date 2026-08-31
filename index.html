@@ -229,6 +229,8 @@ body, #pl-app .pl-today, #pl-app .pl-week-block, #pl-modal-box, #pl-app input, #
 #pl-app .pl-export-dropdown .pl-dropdown-panel button{margin:0;width:100%;}
 #pl-app .pl-waiting{font-style:italic;color:var(--pl-muted);}
 #pl-app .pl-notes{font-size:12.5px;color:var(--pl-muted);margin-top:4px;white-space:pre-wrap;}
+#pl-app .pl-notes a{color:inherit;text-decoration:underline;text-underline-offset:2px;}
+#pl-app .pl-notes a:hover{opacity:0.8;}
 #pl-app .pl-subtasks{margin-top:8px;font-size:12.5px;}
 #pl-app .pl-subtask-row{display:flex;align-items:center;gap:6px;margin-top:3px;}
 #pl-app .pl-subtask-row input{width:auto;margin:0;}
@@ -790,6 +792,25 @@ if ('serviceWorker' in navigator) {
   }
 
   function icsEscape(s){ return (s||'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\n/g,'\\n'); }
+
+  function escapeHtml(s){
+    return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  // Escapes notes text for safe HTML rendering, then turns any http(s):// or
+  // www. links into clickable anchors (opened in a new tab).
+  function linkifyNotes(s){
+    const escaped = escapeHtml(s);
+    return escaped.replace(/((?:https?:\/\/|www\.)[^\s<]+)/gi, (match)=>{
+      let trailing = '';
+      const trailingMatch = match.match(/[.,;:!?)\]]+$/);
+      if(trailingMatch){
+        trailing = trailingMatch[0];
+        match = match.slice(0, -trailing.length);
+      }
+      const href = /^https?:\/\//i.test(match) ? match : 'https://' + match;
+      return `<a href="${href}" target="_blank" rel="noopener noreferrer">${match}</a>${trailing}`;
+    });
+  }
   function exportIcs(){
     const lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Planner//EN'];
     items.filter(it=>!it.archived).forEach((it,idx)=>{
@@ -1183,7 +1204,7 @@ if ('serviceWorker' in navigator) {
             ${it.course? `<span class="pl-tag" style="background:${cardCourseColor};color:${contrastTextColor(cardCourseColor)}">${it.course}</span>` : ''}
             ${it.archived? `<span class="pl-tag" style="background:#555;">Archived</span>` : ''}
             <div><b>${it.title}</b>${it.recurring? `<span class="pl-recurring-tag">\u21bb ${it.recurring}</span>` : ''}</div>
-            ${it.notes? `<div class="pl-notes">${it.notes}</div>` : ''}
+            ${it.notes? `<div class="pl-notes">${linkifyNotes(it.notes)}</div>` : ''}
             ${it.subtasks && it.subtasks.length? `<div class="pl-subtasks">${it.subtasks.map((s,si)=>`<label class="pl-subtask-row"><input type="checkbox" class="pl-subtask-toggle" data-i="${i}" data-si="${si}" ${s.done?'checked':''}><span style="${s.done?'text-decoration:line-through;opacity:0.6;':''}">${s.text}</span></label>`).join('')}</div>` : ''}
           </div>
         </div>
