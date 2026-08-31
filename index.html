@@ -7,6 +7,66 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png">
 <meta name="theme-color" content="#14161f">
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyB9Xyx3JioVqjvOfWvWvhJUAZV4lCWfjuQ",
+    authDomain: "planner-88ab8.firebaseapp.com",
+    projectId: "planner-88ab8",
+    storageBucket: "planner-88ab8.firebasestorage.app",
+    messagingSenderId: "387783207136",
+    appId: "1:387783207136:web:c127dfc6250d40a6abc885"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const provider = new GoogleAuthProvider();
+
+  let currentUser = null;
+  let unsubSnapshot = null;
+  let applyingRemote = false;
+
+  window.plSync = {
+    signIn: () => signInWithPopup(auth, provider),
+    signOut: () => signOut(auth),
+    getUser: () => currentUser,
+    push: async (items) => {
+      if(!currentUser || applyingRemote) return;
+      await setDoc(doc(db, 'users', currentUser.uid, 'planner', 'data'), { items, updatedAt: Date.now() });
+    }
+  };
+
+  onAuthStateChanged(auth, async (user) => {
+    currentUser = user;
+    if(unsubSnapshot){ unsubSnapshot(); unsubSnapshot = null; }
+    document.dispatchEvent(new CustomEvent('pl-auth-changed', { detail: { user } }));
+    if(!user) return;
+
+    const ref = doc(db, 'users', user.uid, 'planner', 'data');
+    const snap = await getDoc(ref);
+    if(snap.exists()){
+      applyingRemote = true;
+      localStorage.setItem('pl-assignments', JSON.stringify(snap.data().items || []));
+      applyingRemote = false;
+      document.dispatchEvent(new CustomEvent('pl-remote-data', {}));
+    } else {
+      const local = JSON.parse(localStorage.getItem('pl-assignments') || '[]');
+      await setDoc(ref, { items: local, updatedAt: Date.now() });
+    }
+
+    unsubSnapshot = onSnapshot(ref, (docSnap) => {
+      if(!docSnap.exists()) return;
+      applyingRemote = true;
+      localStorage.setItem('pl-assignments', JSON.stringify(docSnap.data().items || []));
+      applyingRemote = false;
+      document.dispatchEvent(new CustomEvent('pl-remote-data', {}));
+    });
+  });
+</script>
 <script>
 (function(){
   try{
@@ -359,6 +419,20 @@ body, #pl-app .pl-today, #pl-app .pl-week-block, #pl-modal-box, #pl-app input, #
 </head>
 <body>
 <div id="pl-app"></div>
+<button id="pl-sync-btn" style="position:fixed;bottom:16px;right:16px;z-index:9999;background:#2b2f3d;color:#fff;border:none;border-radius:20px;padding:8px 14px;font-size:13px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.3);">Sign in to sync</button>
+<script>
+(function(){
+  var btn = document.getElementById('pl-sync-btn');
+  btn.addEventListener('click', function(){
+    if(window.plSync && window.plSync.getUser()) window.plSync.signOut();
+    else if(window.plSync) window.plSync.signIn();
+  });
+  document.addEventListener('pl-auth-changed', function(e){
+    var user = e.detail.user;
+    btn.textContent = user ? ('Synced: ' + (user.email || user.displayName || 'account') + ' (sign out)') : 'Sign in to sync';
+  });
+})();
+</script>
 <script>
 if ('serviceWorker' in navigator) {
   const SW_RESET_FLAG = 'pl-sw-reset-v2';
@@ -391,6 +465,7 @@ if ('serviceWorker' in navigator) {
   const ARCHIVE_AFTER_DAYS=14;
 
   let items = JSON.parse(localStorage.getItem(KEY) || '[]');
+  document.addEventListener('pl-remote-data', function(){ items = JSON.parse(localStorage.getItem(KEY) || '[]'); render(); });
   let devMode = localStorage.getItem(DEV_MODE_KEY) === '1';
   let devPanelOpen = localStorage.getItem(DEV_PANEL_KEY) === '1';
   let editIndex = null;
@@ -600,7 +675,7 @@ if ('serviceWorker' in navigator) {
       anim.onfinish = () => el.remove();
     }
   }
-  function save(){ localStorage.setItem(KEY, JSON.stringify(items)); render(); }
+  function save(){ localStorage.setItem(KEY, JSON.stringify(items)); render(); if(window.plSync) window.plSync.push(items); }
   function triggerCelebration(x, y, big){ celebrationPending = {x, y, big: !!big}; }
   function saveDevMode(){ localStorage.setItem(DEV_MODE_KEY, devMode ? '1' : '0'); }
   function saveDevPanelOpen(){ localStorage.setItem(DEV_PANEL_KEY, devPanelOpen ? '1' : '0'); }
