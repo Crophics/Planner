@@ -1,0 +1,1610 @@
+(function(){
+  document.addEventListener('click', function(e){
+    var btn = e.target.closest('#pl-sync-btn');
+    if(!btn) return;
+    if(window.plSync && window.plSync.getUser()) window.plSync.signOut();
+    else if(window.plSync) window.plSync.signIn();
+  });
+  document.addEventListener('pl-auth-changed', function(e){
+    var user = e.detail.user;
+    window.plSyncLabel = user ? ('Synced: ' + (user.email || user.displayName || 'account') + ' (sign out)') : 'Sign in to sync';
+    var btn = document.getElementById('pl-sync-btn');
+    if(btn) btn.textContent = window.plSyncLabel;
+  });
+})();
+
+if ('serviceWorker' in navigator) {
+  const SW_RESET_FLAG = 'pl-sw-reset-v2';
+  if (!localStorage.getItem(SW_RESET_FLAG)) {
+    // One-time: wipe out whatever service worker is currently stuck registered
+    // (common on iOS home-screen apps), then register fresh and reload.
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      Promise.all(regs.map(r => r.unregister())).then(() => {
+        localStorage.setItem(SW_RESET_FLAG, '1');
+        navigator.serviceWorker.register('sw.js').then(() => window.location.reload());
+      });
+    });
+  } else {
+    // Normal path: explicitly ask for an update check every time the app loads,
+    // instead of waiting on Safari's own (unreliable) background check.
+    navigator.serviceWorker.register('sw.js').then(reg => reg.update());
+    navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload());
+  }
+}
+
+(function(){
+  const KEY='pl-assignments';
+  function syncPush(){
+    if(!window.plSync) return;
+    let prefsNow = {};
+    try{ prefsNow = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}'); }catch(e){}
+    const { theme: _theme, todayExpanded: _todayExpanded, ...syncPrefs } = prefsNow;
+    window.plSync.push({
+      items,
+      courseColors,
+      dayCompleteLog,
+      prefs: syncPrefs
+    });
+  }
+  const PREFS_KEY='pl-prefs';
+  const COURSE_COLORS_KEY='pl-course-colors';
+  const DAY_COMPLETE_LOG_KEY='pl-day-complete-log';
+  const DEV_MODE_KEY='pl-dev-mode';
+  const DEV_PANEL_KEY='pl-dev-panel-open';
+  const DAY_OFFSET_KEY='pl-day-offset';
+  const ARCHIVE_AFTER_DAYS=14;
+
+  let items = JSON.parse(localStorage.getItem(KEY) || '[]');
+  document.addEventListener('pl-remote-data', function(){
+    items = JSON.parse(localStorage.getItem(KEY) || '[]');
+    try{ courseColors = JSON.parse(localStorage.getItem(COURSE_COLORS_KEY)) || {}; }catch(e){ courseColors = {}; }
+    try{ dayCompleteLog = JSON.parse(localStorage.getItem(DAY_COMPLETE_LOG_KEY)) || []; }catch(e){ dayCompleteLog = []; }
+    let p = {};
+    try{ p = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}'); }catch(e){}
+    if(p.sortMode !== undefined) sortMode = p.sortMode;
+    if(p.hideDone !== undefined) hideDone = !!p.hideDone;
+    if(p.showArchived !== undefined) showArchived = !!p.showArchived;
+    render();
+  });
+  let devMode = localStorage.getItem(DEV_MODE_KEY) === '1';
+  let devPanelOpen = localStorage.getItem(DEV_PANEL_KEY) === '1';
+  let editIndex = null;
+  let showForm = false;
+  let showCourseManager = false;
+  // Tracks which element should regain focus after the next render.
+  // Either the string 'title' (focus the form's title field) or
+  // {id, selStart, selEnd} to restore focus + cursor position on a specific input.
+  let pendingFocus = null;
+  let pendingScrollId = null;
+  let pendingScrollAlign = 'end';
+  let pendingTodayAnim = false;
+  let weekChartAnimated = false;
+  let overdueFilterActive = false;
+  let dragSrcIndex = null;
+  let celebrationPending = null;
+
+  let prefs = {};
+  try{ prefs = JSON.parse(localStorage.getItem(PREFS_KEY)) || {}; }catch(e){ prefs = {}; }
+  let sortMode = prefs.sortMode || 'urgency';
+  let hideDone = !!prefs.hideDone;
+  let showArchived = !!prefs.showArchived;
+  let searchTerm = prefs.searchTerm || '';
+  let theme = ['dark','light','blue','auto'].includes(prefs.theme) ? prefs.theme : 'blue';
+  let todayExpanded = !!prefs.todayExpanded;
+
+  let courseColors = {};
+  try{ courseColors = JSON.parse(localStorage.getItem(COURSE_COLORS_KEY)) || {}; }catch(e){ courseColors = {}; }
+  function saveCourseColors(){ localStorage.setItem(COURSE_COLORS_KEY, JSON.stringify(courseColors)); syncPush(); }
+
+  // Logged only on days where nothing required is left - not just "did
+  // something" - so the streak reflects actually staying caught up.
+  let dayCompleteLog = [];
+  try{ dayCompleteLog = JSON.parse(localStorage.getItem(DAY_COMPLETE_LOG_KEY)) || []; }catch(e){ dayCompleteLog = []; }
+  function saveDayCompleteLog(){ localStorage.setItem(DAY_COMPLETE_LOG_KEY, JSON.stringify(dayCompleteLog)); syncPush(); }
+  function logDayComplete(){
+    const t = today();
+    const daySet = new Set(dayCompleteLog);
+    if(!daySet.has(t)){
+      dayCompleteLog.push(t);
+      saveDayCompleteLog();
+    }
+  }
+
+  function savePrefs(){
+    localStorage.setItem(PREFS_KEY, JSON.stringify({sortMode,hideDone,showArchived,searchTerm,theme,todayExpanded}));
+    syncPush();
+  }
+
+  const THEME_COLORS = {dark:'#111111', light:'#f4f2ec', blue:'#14161f'};
+  function updateThemeColorMeta(eff){
+    let meta = document.querySelector('meta[name="theme-color"]');
+    if(!meta){
+      meta = document.createElement('meta');
+      meta.setAttribute('name','theme-color');
+      document.head.appendChild(meta);
+    }
+    meta.setAttribute('content', THEME_COLORS[eff] || THEME_COLORS.blue);
+  }
+  function applyTheme(){
+    let eff = theme;
+    if(theme==='auto'){
+      eff = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    }
+    document.documentElement.setAttribute('data-theme', eff);
+    updateThemeColorMeta(eff);
+  }
+  applyTheme();
+  if(window.matchMedia){
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', ()=>{
+      if(theme==='auto') applyTheme();
+    });
+  }
+
+  const root = document.getElementById('pl-app');
+
+  document.addEventListener('keydown', (e)=>{
+    if(e.key === 'Escape' && (editIndex!==null || showForm)){
+      editIndex = null; showForm = false; render();
+      return;
+    }
+    const tag = document.activeElement ? document.activeElement.tagName : '';
+    const typing = tag==='INPUT' || tag==='TEXTAREA' || tag==='SELECT';
+    if(!typing && editIndex===null && !showForm){
+      if(e.key==='n'){
+        e.preventDefault(); showForm = true; pendingFocus = 'title'; render();
+      } else if(e.key==='/'){
+        e.preventDefault();
+        const f = document.getElementById('pl-filter');
+        if(f) f.focus();
+      }
+    }
+  });
+
+  const defaultColors = ['#1fae8e','#f0a824','#e8553c','#4361ee','#b83fd1','#2ea9dd','#e0538a'];
+  let currentColorMap = {};
+  function computeCourseColorMap(){
+    const courseKeys = [...new Set(items.map(i=>(i.course||'').trim().toLowerCase()).filter(Boolean))].sort();
+    const map = {};
+    const usedColors = new Set();
+    // Manual overrides get priority and reserve their color.
+    courseKeys.forEach(key=>{
+      if(courseColors[key]){
+        map[key] = courseColors[key];
+        usedColors.add(courseColors[key]);
+      }
+    });
+    // Everyone else gets the first unused color from the palette.
+    // Only once every color is taken do we fall back to hash-based reuse.
+    courseKeys.forEach(key=>{
+      if(map[key]) return;
+      let assigned = defaultColors.find(c=>!usedColors.has(c));
+      if(!assigned){
+        let h=0; for(let c of key) h = (h*31 + c.charCodeAt(0))>>>0;
+        assigned = defaultColors[h % defaultColors.length];
+      }
+      map[key] = assigned;
+      usedColors.add(assigned);
+    });
+    return map;
+  }
+  function courseColor(course){
+    const key = (course||'').trim().toLowerCase();
+    if(!key) return '#888';
+    return currentColorMap[key] || '#888';
+  }
+  function contrastTextColor(hex){
+    const c = (hex||'#888888').replace('#','');
+    const r = parseInt(c.substring(0,2),16), g = parseInt(c.substring(2,4),16), b = parseInt(c.substring(4,6),16);
+    const luminance = (0.299*r + 0.587*g + 0.114*b) / 255;
+    return luminance > 0.62 ? '#1a1a1a' : '#fff';
+  }
+
+  function renameCourse(oldName, newName){
+    const oldKey = oldName.trim().toLowerCase();
+    const newKey = newName.trim().toLowerCase();
+    items.forEach(it=>{
+      if((it.course||'').trim().toLowerCase()===oldKey) it.course = newName.trim();
+    });
+    if(oldKey!==newKey && courseColors[oldKey]){
+      courseColors[newKey] = courseColors[oldKey];
+      delete courseColors[oldKey];
+      saveCourseColors();
+    }
+    save();
+  }
+
+  // Scrolls an element into a comfortable position and gives it a brief highlight flash.
+  // align 'top' puts the element near the top of the viewport (for jumping to a card);
+  // align 'end' brings the element's bottom fully into view with some clearance below
+  // (for panels near the bottom of the page, like the course manager, that could
+  // otherwise end up hidden behind the fixed FAB). Returns false if the element
+  // isn't currently in the DOM (e.g. hidden by an active search filter).
+  function scrollToAndHighlight(id, align){
+    const el = document.getElementById(id);
+    if(!el) return false;
+    requestAnimationFrame(()=>{
+      const rect = el.getBoundingClientRect();
+      let targetY;
+      if(align==='top'){
+        targetY = window.scrollY + rect.top - 80;
+      } else {
+        const margin = 100;
+        targetY = window.scrollY + rect.bottom - window.innerHeight + margin;
+      }
+      window.scrollTo({top: Math.max(targetY, 0), behavior:'smooth'});
+    });
+    el.classList.add('pl-card-highlight');
+    setTimeout(()=> el.classList.remove('pl-card-highlight'), 1600);
+    return true;
+  }
+
+  function burstConfetti(x, y, opts){
+    if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const big = !!(opts && opts.big);
+    const colors = ['#4f8b74','#f0a824','#e8553c','#4361ee','#b83fd1','#2ea9dd','#e0538a','#ffd23f'];
+    const count = big ? 70 : 30;
+    for(let i=0;i<count;i++){
+      const el = document.createElement('div');
+      const isCircle = Math.random() < 0.45;
+      const size = (big? 6:5) + Math.random()*(big? 10:7);
+      el.style.position = 'fixed';
+      el.style.left = x+'px';
+      el.style.top = y+'px';
+      el.style.width = size+'px';
+      el.style.height = (isCircle? size : size*0.4)+'px';
+      el.style.background = colors[Math.floor(Math.random()*colors.length)];
+      el.style.borderRadius = isCircle ? '50%' : '2px';
+      el.style.pointerEvents = 'none';
+      el.style.zIndex = '3000';
+      el.style.willChange = 'transform, opacity';
+      document.body.appendChild(el);
+      // Mostly-upward "party popper" spread rather than a flat radial burst.
+      const angle = -Math.PI/2 + (Math.random()-0.5)*Math.PI*(big?1.9:1.7);
+      const power = (big? 140:90) + Math.random()*(big?220:130);
+      const dx = Math.cos(angle)*power;
+      const dyBurst = Math.sin(angle)*power;
+      const wobble = (Math.random()-0.5)*(big?70:50);
+      const rotateStart = Math.random()*360;
+      const rotateEnd = rotateStart + (Math.random()*900 - 450);
+      const duration = (big? 1900:1500) + Math.random()*(big?900:700);
+      const anim = el.animate([
+        { transform:`translate(0,0) rotate(${rotateStart}deg) scale(0.3)`, opacity:1, offset:0 },
+        { transform:`translate(${dx}px, ${dyBurst}px) rotate(${rotateStart + rotateEnd*0.3}deg) scale(1)`, opacity:1, offset:0.3 },
+        { transform:`translate(${dx+wobble}px, ${dyBurst+150}px) rotate(${rotateEnd}deg) scale(0.9)`, opacity:0.9, offset:0.75 },
+        { transform:`translate(${dx+wobble*1.4}px, ${dyBurst+(big?320:280)}px) rotate(${rotateEnd+130}deg) scale(0.8)`, opacity:0, offset:1 }
+      ], { duration, easing:'cubic-bezier(.17,.89,.32,1.25)', fill:'forwards' });
+      anim.onfinish = () => el.remove();
+    }
+  }
+  function save(){ localStorage.setItem(KEY, JSON.stringify(items)); render(); syncPush(); }
+  function triggerCelebration(x, y, big){ celebrationPending = {x, y, big: !!big}; }
+  function saveDevMode(){ localStorage.setItem(DEV_MODE_KEY, devMode ? '1' : '0'); }
+  function saveDevPanelOpen(){ localStorage.setItem(DEV_PANEL_KEY, devPanelOpen ? '1' : '0'); }
+  function isDevModeTrigger(title, total){
+    return String(title || '').trim().toLowerCase() === 'dev mode' && Number(total) === 101;
+  }
+  function activateDevMode(){
+    if(devMode) return;
+    devMode = true;
+    saveDevMode();
+    showToast('Dev mode enabled');
+  }
+  function deactivateDevMode(){
+    if(!devMode) return;
+    devMode = false;
+    devPanelOpen = false;
+    saveDevMode();
+    saveDevPanelOpen();
+    showToast('Dev mode disabled');
+  }
+  function asDate(dateStr){ return new Date(dateStr + 'T00:00:00'); }
+  function today(){
+    const d = new Date();
+    const offset = Number(localStorage.getItem(DAY_OFFSET_KEY) || 0);
+    if(Number.isFinite(offset)) d.setDate(d.getDate() + offset);
+    d.setHours(0,0,0,0);
+    return d.toISOString().slice(0,10);
+  }
+  function daysBetween(a, b){ return Math.round((asDate(b) - asDate(a)) / 86400000); }
+  function addDays(dateStr, n){ const d = asDate(dateStr); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+  function addMonths(dateStr, n){ const d = asDate(dateStr); d.setMonth(d.getMonth()+n); return d.toISOString().slice(0,10); }
+  function nextDueDate(due, recurring){
+    if(recurring==='weekly') return addDays(due,7);
+    if(recurring==='monthly') return addMonths(due,1);
+    return due;
+  }
+  function relativeDueLabel(dateStr){
+    const d = daysBetween(today(), dateStr);
+    if(d===0) return 'Today';
+    if(d===1) return 'Tomorrow';
+    if(d===-1) return 'Yesterday';
+    if(d>=2 && d<=6) return asDate(dateStr).toLocaleDateString(undefined,{weekday:'long'});
+    if(d<=-2 && d>=-6) return Math.abs(d)+'d ago';
+    return asDate(dateStr).toLocaleDateString(undefined,{month:'short', day:'numeric'});
+  }
+  function fullDateLabel(dateStr){
+    return asDate(dateStr).toLocaleDateString(undefined,{month:'short', day:'numeric', year:'numeric'});
+  }
+  function urgencyClass(daysLeft, completed){
+    if(completed) return '';
+    if(daysLeft<0) return 'pl-overdue';
+    if(daysLeft<=2) return 'pl-urgent';
+    if(daysLeft<=5) return 'pl-soon';
+    return 'pl-ok';
+  }
+  function fmt(n){ return Number.isInteger(n)? n : Math.round(n*10)/10; }
+  // Singularizes a plural unit label (e.g. "chapters" -> "chapter") when the
+  // count is exactly 1. Simple trailing-"s" strip covers the common cases
+  // (chapters, pages, problems, readings...); irregular units just won't
+  // singularize, which is a harmless no-op.
+  function unitLabel(amt, unit){
+    if(amt===1 && unit && unit.endsWith('s')) return unit.slice(0,-1);
+    return unit;
+  }
+  // When a unit is shown without a number next to it (just "Reading" instead
+  // of "1 reading"), capitalize it so it reads like a label, not a fragment.
+  function capUnit(unit){
+    return unit ? unit.charAt(0).toUpperCase()+unit.slice(1) : unit;
+  }
+
+  function isLocked(it){
+    if(!it.dependsOn) return false;
+    const prereq = items.find(x=>x.title===it.dependsOn);
+    return prereq ? !prereq.completed : false;
+  }
+
+  // An item whose prerequisite was JUST completed today shouldn't immediately
+  // join Today's Targets (required or optional) - that would make it look
+  // like there's still more to do the same day you already made progress on
+  // that chain. It surfaces normally starting tomorrow.
+  function unlockedToday(it){
+    if(!it.dependsOn) return false;
+    const prereq = items.find(x=>x.title===it.dependsOn);
+    return !!(prereq && prereq.completed && prereq.completedAt===today());
+  }
+
+  // Reorders items by dragging: src/target are indices into the `items` array.
+  // Renumbers `order` only for the currently visible+sorted set (`currentList`)
+  // so items hidden by filters keep their existing relative order untouched.
+  function reorderByDrag(srcIdx, targetIdx, currentList){
+    const positions = currentList.map(x=>x.i);
+    const from = positions.indexOf(srcIdx);
+    const to = positions.indexOf(targetIdx);
+    if(from<0 || to<0 || from===to) return;
+    positions.splice(to, 0, positions.splice(from,1)[0]);
+    positions.forEach((itemIdx, order)=>{ items[itemIdx].order = order; });
+    save();
+  }
+
+  function currentStreak(){
+    const daySet = new Set(dayCompleteLog);
+    let streak = 0;
+    let d = today();
+    if (!daySet.has(d)) {
+      d = addDays(d, -1);
+    }
+    while (daySet.has(d)) {
+      streak++;
+      d = addDays(d, -1);
+    }
+    return streak;
+  }
+  function completedThisWeek(){
+    const cutoff = addDays(today(),-6);
+    return items.filter(i=>i.completed && i.completedAt && i.completedAt>=cutoff).length;
+  }
+
+  function autoArchive(){
+    let changed=false;
+    items.forEach(it=>{
+      if(it.completed && it.completedAt && !it.archived && daysBetween(it.completedAt, today())>=ARCHIVE_AFTER_DAYS){
+        it.archived = true; changed=true;
+      }
+    });
+    if(changed) localStorage.setItem(KEY, JSON.stringify(items));
+  }
+  autoArchive();
+
+  function ensureOrder(){
+    let changed=false;
+    items.forEach((it,idx)=>{
+      if(it.order===undefined){ it.order = idx; changed=true; }
+    });
+    if(changed) localStorage.setItem(KEY, JSON.stringify(items));
+  }
+  ensureOrder();
+
+  const NOTIFY_LOG_KEY = 'pl-notify-log';
+  function getNotifyLog(){
+    try{ return JSON.parse(localStorage.getItem(NOTIFY_LOG_KEY)) || []; }catch(e){ return []; }
+  }
+  function saveNotifyLog(log){ localStorage.setItem(NOTIFY_LOG_KEY, JSON.stringify(log)); }
+
+  function checkAndNotify(){
+    if(!('Notification' in window)) return;
+    if(Notification.permission !== 'granted') return;
+    const log = getNotifyLog();
+    const logSet = new Set(log);
+    const t = today();
+    const tmrw = addDays(t,1);
+    const dueSoon = items.filter(it=>!it.completed && !it.archived && !isLocked(it) && (it.due===t || it.due===tmrw));
+    dueSoon.forEach(it=>{
+      const key = t+'|'+it.title;
+      if(!logSet.has(key)){
+        const when = it.due===t ? 'today' : 'tomorrow';
+        const title = it.due===t ? `${it.title} is due today` : `${it.title} is due tomorrow`;
+        const body = (it.course ? it.course + ' • ' : '') + (it.due===t ? 'Wrap this up today.' : 'Plan some time for this tomorrow.');
+        new Notification(title, {
+          body,
+          icon: 'icons/icon-192.png'
+        });
+        log.push(key);
+        logSet.add(key);
+      }
+    });
+    const cutoff = addDays(t,-3);
+    saveNotifyLog(log.filter(k => k.split('|')[0] >= cutoff));
+  }
+  checkAndNotify();
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState==='visible') checkAndNotify();
+  });
+
+  function makeRecurringClone(it){
+    const maxOrder = items.reduce((m,x)=> Math.max(m, x.order ?? -1), -1);
+    return {
+      title: it.title, course: it.course, due: nextDueDate(it.due, it.recurring),
+      total: it.total, unit: it.unit, notes: it.notes, done: 0, completed: false,
+      dependsOn: '', recurring: it.recurring,
+      subtasks: (it.subtasks||[]).map(s=>({text:s.text, done:false})),
+      completedAt: null, createdAt: today(), archived: false, order: maxOrder+1
+    };
+  }
+
+  let toastTimeout = null;
+  function showToast(message, onUndo){
+    let toast = document.getElementById('pl-toast');
+    if(!toast){
+      toast = document.createElement('div');
+      toast.id = 'pl-toast';
+      document.body.appendChild(toast);
+    }
+    const hasUndo = typeof onUndo === 'function';
+    toast.innerHTML = hasUndo
+      ? `<span>${message}</span><button id="pl-toast-undo">Undo</button>`
+      : `<span>${message}</span>`;
+    toast.style.display = 'flex';
+    toast.classList.remove('pl-toast-anim');
+    void toast.offsetWidth;
+    toast.classList.add('pl-toast-anim');
+    if(hasUndo){
+      document.getElementById('pl-toast-undo').onclick = ()=>{
+        onUndo();
+        hideToast();
+      };
+    }
+    clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(hideToast, 6000);
+  }
+  function hideToast(){
+    const toast = document.getElementById('pl-toast');
+    if(toast) toast.style.display = 'none';
+  }
+
+  function deleteItemAt(idx){
+    const finish = ()=>{
+      const removed = items[idx];
+      items.splice(idx,1);
+      save();
+      showToast(`Deleted "${removed.title}"`, ()=>{
+        items.splice(idx,0,removed);
+        save();
+      });
+    };
+    const el = document.getElementById('pl-card-'+idx);
+    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if(el && !reduced){
+      el.classList.add('pl-removing');
+      el.addEventListener('animationend', finish, {once:true});
+    } else {
+      finish();
+    }
+  }
+
+  function clearCompleted(){
+    const idxs = items.map((it,idx)=> it.completed ? idx : -1).filter(idx=>idx>=0);
+    if(idxs.length===0) return;
+    const removed = idxs.map(i=>({item:items[i], index:i}));
+    [...idxs].reverse().forEach(i=> items.splice(i,1));
+    save();
+    showToast(`Deleted ${removed.length} completed assignment${removed.length>1?'s':''}`, ()=>{
+      removed.forEach(r=> items.splice(r.index,0,r.item));
+      save();
+    });
+  }
+
+  function dependsOptionsHtml(course, selected, excludeItem){
+    const matches = items.filter(it => it!==excludeItem && (it.course||'').trim().toLowerCase() === (course||'').trim().toLowerCase() && course);
+    return `<option value="">No prerequisite</option>` +
+      matches.map(it=>`<option value="${it.title}" ${selected===it.title?'selected':''}>${it.title}</option>`).join('');
+  }
+
+  function formHtml(existing){
+    const e = existing || {title:'',due:'',total:'',course:'',unit:'',dependsOn:'',notes:'',recurring:'',subtasks:[]};
+    return `<h3>${existing? 'Edit Assignment' : 'Add Assignment'}</h3>
+      <input id="pl-title" placeholder="Title" value="${e.title}">
+      <input id="pl-course" placeholder="Course (e.g. NT)" value="${e.course||''}">
+      <div class="pl-date-wrap">
+        <input id="pl-due" type="date" value="${e.due}" required aria-label="Due date">
+        <span class="pl-date-placeholder">Due Date</span>
+      </div>
+      <input id="pl-units" type="number" placeholder="Total amount" value="${e.total}">
+      <input id="pl-unitlabel" placeholder="Unit (pages, chapters, problems...)" value="${e.unit||''}">
+      <textarea id="pl-notes" placeholder="Notes (optional)">${e.notes||''}</textarea>
+      <textarea id="pl-subtasks" placeholder="Subtasks, one per line (optional)">${(e.subtasks||[]).map(s=>s.text).join('\n')}</textarea>
+      <label>Repeat:</label>
+      <select id="pl-recurring">
+        <option value="" ${!e.recurring?'selected':''}>Does not repeat</option>
+        <option value="weekly" ${e.recurring==='weekly'?'selected':''}>Weekly</option>
+        <option value="monthly" ${e.recurring==='monthly'?'selected':''}>Monthly</option>
+      </select>
+      <label>Do this after (same course only):</label>
+      <select id="pl-depends">
+        ${dependsOptionsHtml(e.course, e.dependsOn, existing)}
+      </select>
+      <button id="pl-save">${existing? 'Save Changes' : 'Add'}</button>`;
+  }
+
+  function exportData(){
+    const blob = new Blob([JSON.stringify(items,null,2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'planner-backup.json'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function icsEscape(s){ return (s||'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\n/g,'\\n'); }
+
+  function escapeHtml(s){
+    return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  // Escapes notes text for safe HTML rendering, then turns any http(s):// or
+  // www. links into clickable anchors (opened in a new tab).
+  function linkifyNotes(s){
+    const escaped = escapeHtml(s);
+    return escaped.replace(/((?:https?:\/\/|www\.)[^\s<]+)/gi, (match)=>{
+      let trailing = '';
+      const trailingMatch = match.match(/[.,;:!?)\]]+$/);
+      if(trailingMatch){
+        trailing = trailingMatch[0];
+        match = match.slice(0, -trailing.length);
+      }
+      const href = /^https?:\/\//i.test(match) ? match : 'https://' + match;
+      return `<a href="${href}" target="_blank" rel="noopener noreferrer">${match}</a>${trailing}`;
+    });
+  }
+  function exportIcs(){
+    const lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Planner//EN'];
+    items.filter(it=>!it.archived).forEach((it,idx)=>{
+      const dt = (it.due||'').replace(/-/g,'');
+      if(!dt) return;
+      lines.push('BEGIN:VEVENT');
+      lines.push(`UID:planner-${idx}-${Date.now()}@local`);
+      lines.push(`DTSTAMP:${new Date().toISOString().replace(/[-:]/g,'').split('.')[0]}Z`);
+      lines.push(`DTSTART;VALUE=DATE:${dt}`);
+      lines.push(`SUMMARY:${icsEscape(it.title + (it.course? ' ['+it.course+']':''))}`);
+      if(it.notes) lines.push(`DESCRIPTION:${icsEscape(it.notes)}`);
+      lines.push('END:VEVENT');
+    });
+    lines.push('END:VCALENDAR');
+    const blob = new Blob([lines.join('\r\n')], {type:'text/calendar'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'planner.ics'; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function importData(file){
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      try{
+        const data = JSON.parse(e.target.result);
+        if(Array.isArray(data)){ items = data; save(); }
+        else alert('Invalid file format');
+      }catch(err){ alert('Could not read file'); }
+    };
+    reader.readAsText(file);
+  }
+
+  function weekChartHtml(summaryText, animate){
+    const days = [];
+    for(let i=0;i<7;i++){
+      const d = addDays(today(), i);
+      const dayItems = items.filter(it=>!it.completed && !it.archived && it.due===d);
+      const byCourse = {};
+      dayItems.forEach(it=>{
+        const key = (it.course||'').trim() || 'Other';
+        byCourse[key] = (byCourse[key]||0)+1;
+      });
+      days.push({d, total: dayItems.length, byCourse});
+    }
+    const max = Math.max(1, ...days.map(x=>x.total));
+    const barsHtml = days.map(x=>{
+      const label = new Date(x.d+'T00:00:00').toLocaleDateString(undefined,{weekday:'short'});
+      const totalH = Math.round((x.total/max)*36)+4;
+      const courseEntries = Object.entries(x.byCourse);
+      let barHtml;
+      if(courseEntries.length===0){
+        barHtml = `<div class="pl-week-bar" style="height:${totalH}px;"></div>`;
+      } else {
+        barHtml = `<div class="pl-week-bar-stack" style="height:${totalH}px;">` +
+          courseEntries.map(([course,count])=>{
+            const segH = Math.max(4, Math.round((count/x.total)*totalH));
+            return `<div class="pl-week-seg" style="background:${courseColor(course)};height:${segH}px;" title="${course}: ${count}"></div>`;
+          }).join('') +
+        `</div>`;
+      }
+      return `<div class="pl-week-col">${barHtml}<div class="pl-week-label">${label}</div></div>`;
+    }).join('');
+    return `<div class="pl-week-block${animate?' pl-week-animate':''}">
+      <div class="pl-summary">${summaryText}</div>
+      <div class="pl-week">${barsHtml}</div>
+    </div>`;
+  }
+
+  function getDailyStreakNotice(){
+    const todayKey = today();
+    const seen = localStorage.getItem('pl-streak-banner-seen-date');
+    const dismissed = localStorage.getItem('pl-streak-banner-dismissed-date');
+    if(seen === todayKey || dismissed === todayKey) return null;
+
+    const streak = currentStreak();
+    return {
+      message: streak > 0
+        ? `Your ${streak}-day streak is still active. Keep the momentum going today.`
+        : 'Your streak ended today. Reset your focus and build it back tomorrow.'
+    };
+  }
+
+  function dismissDailyStreakNotice(){
+    localStorage.setItem('pl-streak-banner-dismissed-date', today());
+    localStorage.setItem('pl-streak-banner-seen-date', today());
+  }
+
+  // Computes which items are "required today" (multi-part items that still need
+  // progress logged today to stay on pace, plus singles due today/overdue), plus
+  // the optional/credit-eligible buckets and whether today counts as fully done.
+  // Pulled out of render() so click handlers can call it too, to check whether
+  // an action just completed the whole day (-> big confetti) rather than just
+  // one item (-> small confetti).
+  function computeTodayPanel(){
+    const active = items.filter(x=>!x.completed && !x.archived && !isLocked(x) && !unlockedToday(x));
+    const multi = active.filter(it=>it.total>1);
+    const singles = active.filter(it=>it.total<=1 && it.done<it.total);
+
+    let dailyTargetsChanged = false;
+    multi.forEach(it=>{
+      const t = today();
+      const dt = it.dailyTarget;
+      if(!dt || dt.date!==t || dt.total!==it.total || dt.due!==it.due){
+        const left = Math.max(it.total-it.done,0);
+        const daysLeft = Math.max(daysBetween(t, it.due),1);
+        it.dailyTarget = {
+          date: t, startDone: it.done, total: it.total, due: it.due,
+          amt: left>0? Math.ceil(left/daysLeft) : 0
+        };
+        dailyTargetsChanged = true;
+      }
+    });
+    if(dailyTargetsChanged) localStorage.setItem(KEY, JSON.stringify(items));
+
+    const multiTargets = multi.map(it=>{
+      const left = Math.max(it.total-it.done,0);
+      const daysLeft = Math.max(daysBetween(today(), it.due),1);
+      const progressToday = Math.max(it.done - it.dailyTarget.startDone, 0);
+      const remainingToday = Math.max(it.dailyTarget.amt - progressToday, 0);
+      return {
+        it, title:it.title, unit:it.unit||'units',
+        amt: remainingToday,
+        tight: it.due<=today(),
+        overdue: it.due<today(),
+        dueToday: it.due===today(),
+        noSlack: left>=daysLeft
+      };
+    }).filter(t=>t.amt>0);
+
+    let requiredTight = multiTargets.filter(t=>t.noSlack && t.tight)
+      .concat(singles.filter(it=>daysBetween(today(), it.due)<=0)
+        .map(it=>({it, title:it.title, unit:it.unit||'reading', amt:1, tight:true, overdue: daysBetween(today(), it.due)<0, dueToday: it.due===today()})))
+      .sort((a,b)=> a.it.due.localeCompare(b.it.due));
+    const requiredPace = multiTargets.filter(t=>t.noSlack && !t.tight)
+      .sort((a,b)=> a.it.due.localeCompare(b.it.due));
+
+    const requiredItemsSet = new Set([...requiredTight.map(t=>t.it), ...requiredPace.map(t=>t.it)]);
+    const optionalByDue = new Map();
+    function addOptional(due, entry){
+      if(!optionalByDue.has(due)) optionalByDue.set(due, []);
+      optionalByDue.get(due).push(entry);
+    }
+    multiTargets.filter(t=>!t.noSlack).forEach(t=>{
+      addOptional(t.it.due, {kind:'multi', it:t.it, title:t.title, unit:t.unit, amt:t.amt});
+    });
+    singles.forEach(it=>{
+      if(!requiredItemsSet.has(it)){
+        const d = daysBetween(today(), it.due);
+        if(d>=0) addOptional(it.due, {kind:'single', it, title:it.title, unit:it.unit||'reading'});
+      }
+    });
+    const optionalBuckets = [...optionalByDue.entries()]
+      .sort((a,b)=> a[0].localeCompare(b[0]))
+      .map(([due, entries])=>{
+        const singleCount = entries.filter(e=>e.kind==='single').length;
+        const daysAvailable = Math.max(daysBetween(today(), due), 1);
+        const pickCount = (singleCount>1 && singleCount===entries.length && singleCount>=daysAvailable)
+          ? Math.ceil(singleCount/daysAvailable) : null;
+        return {due, entries, pickCount};
+      });
+
+    // A bucket where you must pick ALL of its entries (pickCount === entries.length)
+    // isn't really an "optional pick" anymore - it's required, so it belongs in
+    // the top required section instead of the "do X of these" pick-bucket list.
+    optionalBuckets.filter(b=>b.pickCount && b.pickCount===b.entries.length).forEach(b=>{
+      b.entries.forEach(e=>{
+        // tight:false - these are due today because they're being folded out of a
+        // full-bucket pick, not because they're overdue/out of slack, so they
+        // shouldn't get the "no slack" warning flag/red dot treatment.
+        requiredTight.push({it:e.it, title:e.title, unit:e.unit||'reading', amt:1, tight:false, overdue:false, dueToday: e.it.due===today()});
+      });
+    });
+    const optionalBucketsFinal = optionalBuckets.filter(b=>!(b.pickCount && b.pickCount===b.entries.length));
+    requiredTight = requiredTight.sort((a,b)=> a.it.due.localeCompare(b.it.due));
+
+    const hasRequired = requiredTight.length || requiredPace.length;
+    const pickBuckets = optionalBucketsFinal.filter(b=>b.pickCount);
+    const hasPriorAssignmentWork = items.some(it => !it.completed && !it.archived && (it.createdAt ? it.createdAt < today() : it.due < today()));
+    // Matches the "You're all set for today" state shown in the Today panel:
+    // nothing required, no must-pick optional buckets, and there was actually
+    // something to do today in the first place (so an empty planner doesn't
+    // read as "day complete").
+    const allDoneToday = !hasRequired && pickBuckets.length===0 && hasPriorAssignmentWork;
+
+    return {active, multi, singles, multiTargets, requiredTight, requiredPace, optionalBuckets: optionalBucketsFinal, hasRequired, pickBuckets, hasPriorAssignmentWork, allDoneToday};
+  }
+  // "Is there still required or must-pick work today" — used to detect the
+  // completion click that clears it out (-> big confetti). Deliberately
+  // skips the hasPriorAssignmentWork gate baked into allDoneToday (that gate
+  // exists only so an empty planner doesn't log a false streak day; it would
+  // otherwise block confetti for anything added today).
+  function hasTodayWorkRemaining(){
+    const {hasRequired, pickBuckets} = computeTodayPanel();
+    return hasRequired || pickBuckets.length>0;
+  }
+
+  function render(){
+    currentColorMap = computeCourseColorMap();
+
+    let html = '';
+
+    html += `<div class="pl-topbar">
+      <div class="pl-search-wrap">
+        <input id="pl-filter" placeholder="Search title, course, notes..." value="${searchTerm}">
+        ${searchTerm? `<button id="pl-search-clear" type="button" class="pl-search-clear" aria-label="Clear search">&times;</button>` : ''}
+      </div>
+      <select id="pl-sort">
+        <option value="urgency" ${sortMode==='urgency'?'selected':''}>Urgency</option>
+        <option value="due" ${sortMode==='due'?'selected':''}>Due date</option>
+        <option value="custom" ${sortMode==='custom'?'selected':''}>Custom (drag order)</option>
+      </select>
+    </div>`;
+
+    const overdueCount = items.filter(it=>!it.completed && !it.archived && !isLocked(it) && daysBetween(today(), it.due)<0).length;
+    if(overdueCount>0){
+      html += `<div class="pl-overdue-banner ${overdueFilterActive?'pl-active':''}" id="pl-overdue-banner">
+        \u26a0 ${overdueCount} overdue ${overdueFilterActive? '\u00b7 tap to clear' : '\u00b7 tap to view'}
+      </div>`;
+    }
+
+    const totalActive = items.filter(i=>!i.completed).length;
+    const totalCompleted = items.filter(i=>i.completed).length;
+    const thisWeek = completedThisWeek();
+    const streak = currentStreak();
+    const streakText = streak > 0 ? `${streak}-day streak 🔥` : '';
+    const summaryText = `${totalActive} active \u00b7 ${totalCompleted} completed${streak>0? ' \u00b7 '+streakText : ''}`;
+
+    html += weekChartHtml(summaryText, !weekChartAnimated);
+    weekChartAnimated = true;
+
+    const streakNotice = getDailyStreakNotice();
+    if(streakNotice){
+      html += `<div class="pl-streak-banner" id="pl-streak-banner">
+        <div class="pl-streak-banner-text">${streakNotice.message}</div>
+        <button type="button" class="pl-streak-dismiss" id="pl-streak-dismiss" aria-label="Dismiss daily streak notice">×</button>
+      </div>`;
+    }
+
+    let list = items.map((it,i)=>({it,i}));
+    if(!showArchived) list = list.filter(x=>!x.it.archived);
+    if(hideDone) list = list.filter(x=>!x.it.completed);
+    if(overdueFilterActive) list = list.filter(x=>!x.it.completed && !isLocked(x.it) && daysBetween(today(), x.it.due)<0);
+    if(searchTerm){
+      const q = searchTerm.toLowerCase();
+      list = list.filter(x=>
+        (x.it.title||'').toLowerCase().includes(q) ||
+        (x.it.course||'').toLowerCase().includes(q) ||
+        (x.it.notes||'').toLowerCase().includes(q)
+      );
+    }
+    function sortPriority(it){ return isLocked(it) ? 2 : (it.completed ? 1 : 0); }
+
+    if(sortMode==='custom') list.sort((a,b)=>{
+      const pa=sortPriority(a.it), pb=sortPriority(b.it);
+      if(pa!==pb) return pa-pb;
+      return (a.it.order ?? a.i) - (b.it.order ?? b.i);
+    });
+    else if(sortMode==='due') list.sort((a,b)=>{
+      const pa=sortPriority(a.it), pb=sortPriority(b.it);
+      if(pa!==pb) return pa-pb;
+      return a.it.due.localeCompare(b.it.due);
+    });
+    else list.sort((a,b)=>{
+      const pa=sortPriority(a.it), pb=sortPriority(b.it);
+      if(pa!==pb) return pa-pb;
+      return daysBetween(today(),a.it.due) - daysBetween(today(),b.it.due);
+    });
+
+    const {active, multi, singles, multiTargets, requiredTight, requiredPace, optionalBuckets, hasRequired, pickBuckets, hasPriorAssignmentWork, allDoneToday} = computeTodayPanel();
+
+    const itemIndexMap = new Map(items.map((it,idx)=>[it, idx]));
+
+    function requiredRowHtml(t, subheadClass){
+      const dotClass = t.overdue ? 'pl-today-dot-tight' : (t.dueToday ? 'pl-today-dot-due-today' : '');
+      const idx = itemIndexMap.get(t.it);
+      const idxAttr = idx!==undefined ? ` data-item-i="${idx}"` : '';
+      const dueHint = `<span class="pl-today-due-hint">Due ${relativeDueLabel(t.it.due)}</span>`;
+      // Single-part assignments are binary (do it or don't) - an amount
+      // badge like "1 reading" adds nothing, so only multi-part items get one.
+      const amtBadge = `<span class="pl-today-amt">${t.it.total>1 ? fmt(t.amt)+' '+unitLabel(t.amt,t.unit) : capUnit(t.unit)}</span>`;
+      return `<div class="pl-today-row pl-today-clickable"${idxAttr}>
+        <span class="pl-today-title"><span class="pl-today-dot ${dotClass}"></span><span class="pl-today-title-col"><span class="pl-today-title-main">${t.title}</span>${dueHint}</span></span>
+        ${amtBadge}
+      </div>`;
+    }
+
+    function optionalBucketHtml(bucket){
+      const headerText = bucket.pickCount
+        ? `Due ${relativeDueLabel(bucket.due)} - do ${bucket.pickCount} of these`
+        : `Due ${relativeDueLabel(bucket.due)}`;
+      // Pick buckets have no slack left, so they're required (green), not
+      // optional (dashed grey) - same meaning as the compact view.
+      const dotClass = bucket.pickCount ? '' : 'pl-today-dot-optional';
+      const rowClass = bucket.pickCount ? 'pl-today-clickable' : 'pl-today-clickable pl-today-optional';
+      const rows = bucket.entries.map(e=>{
+        const idx = itemIndexMap.get(e.it);
+        const idxAttr = idx!==undefined ? ` data-item-i="${idx}"` : '';
+        const amtBadge = `<span class="pl-today-amt">${e.kind==='multi' ? fmt(e.amt)+' '+unitLabel(e.amt,e.unit) : capUnit(e.unit)}</span>`;
+        return `<div class="pl-today-row ${rowClass}"${idxAttr}>
+          <span class="pl-today-title"><span class="pl-today-dot ${dotClass}"></span><span class="pl-today-title-main">${e.title}</span></span>
+          ${amtBadge}
+        </div>`;
+      }).join('');
+      return `<div class="pl-today-group-header">${headerText}</div>` + rows;
+    }
+
+    // A pick-count bucket ("do 1 of these 2") still represents real work needed
+    // today to keep pace, even though which item satisfies it is a free choice —
+    // so the condensed view surfaces it as one summary line, without spelling out
+    // every option (that detail lives in the expanded view).
+    function compactPickBucketHtml(bucket){
+      const headerText = `Due ${relativeDueLabel(bucket.due)} - do ${bucket.pickCount} of these`;
+      const rows = bucket.entries.map(e=>{
+        const idx = itemIndexMap.get(e.it);
+        const idxAttr = idx!==undefined ? ` data-item-i="${idx}"` : '';
+        return `<div class="pl-today-row pl-today-clickable"${idxAttr}>
+          <span class="pl-today-title"><span class="pl-today-dot"></span><span class="pl-today-title-main">${e.title}</span></span>
+          <span class="pl-today-amt">${capUnit(e.unit)}</span>
+        </div>`;
+      }).join('');
+      return `<div class="pl-today-group-header">${headerText}</div>` + rows;
+    }
+    function compactOptionalBucketHtml(bucket){
+      const headerText = `Later - due ${relativeDueLabel(bucket.due)}`;
+      const rows = bucket.entries.slice(0, 2).map(e=>{
+        const idx = itemIndexMap.get(e.it);
+        const idxAttr = idx!==undefined ? ` data-item-i="${idx}"` : '';
+        return `<div class="pl-today-row pl-today-clickable pl-today-optional"${idxAttr}>
+          <span class="pl-today-title"><span class="pl-today-dot pl-today-dot-optional"></span><span class="pl-today-title-main">${e.title}</span></span>
+          <span class="pl-today-amt">${capUnit(e.unit)}</span>
+        </div>`;
+      }).join('');
+      const more = bucket.entries.length > 2 ? `<div class="pl-today-row pl-today-optional"><span class="pl-today-title"><span class="pl-today-dot pl-today-dot-optional"></span><span class="pl-today-title-main">+${bucket.entries.length - 2} more</span></span></div>` : '';
+      return `<div class="pl-today-group-header">${headerText}</div>` + rows + more;
+    }
+
+    const laterBuckets = optionalBuckets.filter(b=>!b.pickCount);
+    const requiredItemSet = new Set([
+      ...requiredTight.map(t => t.it),
+      ...requiredPace.map(t => t.it),
+      ...pickBuckets.flatMap(bucket => bucket.entries.map(e => e.it))
+    ]);
+    if(allDoneToday) logDayComplete();
+    const requiredRowsHtml = requiredTight.map(t=>requiredRowHtml(t,false)).join('') + requiredPace.map(t=>requiredRowHtml(t,true)).join('');
+
+    const compactHasAnything = hasRequired || pickBuckets.length;
+    const compactBody = compactHasAnything
+      ? requiredRowsHtml + pickBuckets.map(b=>compactPickBucketHtml(b)).join('')
+      : '<div class="pl-today-row"><span>You\'re all set for today.</span></div>';
+
+    const expandedBody = (hasRequired
+        ? requiredRowsHtml
+        : (optionalBuckets.length
+            ? '<div class="pl-today-row"><span>You\'re all set for today - but here\'s what you can do to get ahead:</span></div>'
+            : '<div class="pl-today-row"><span>Nothing due today - you\'re caught up.</span></div>')) +
+      optionalBuckets.map(b=>optionalBucketHtml(b)).join('');
+
+    html = `<div class="pl-today" id="pl-today-card">
+      <div class="pl-today-header-row">
+        <b>Today's Targets</b>
+        <button type="button" id="pl-today-toggle" class="pl-today-toggle-btn" aria-expanded="${todayExpanded}" aria-label="${todayExpanded? 'Show less' : 'Show all'}"><span class="pl-today-arrow${todayExpanded?' pl-today-arrow-open':''}">\u203a</span></button>
+      </div>
+      <div class="pl-today-body-anim">` +
+      (todayExpanded? expandedBody : compactBody) +
+      `</div></div>` + html;
+
+    if(list.length===0){
+      const filtersActive = !!(searchTerm || hideDone || overdueFilterActive);
+      html += `<div class="pl-empty">${items.length===0
+        ? "No assignments yet. Click \u201c+ Add Assignment\u201d to get started."
+        : "Nothing matches your current filters."}
+        ${(items.length>0 && filtersActive)? `<div style="margin-top:10px;"><button id="pl-clear-filters" type="button" class="pl-secondary">Clear search &amp; filters</button></div>` : ''}
+      </div>`;
+    }
+
+    list.forEach(({it,i}, pos)=>{
+      const locked = isLocked(it);
+      const left = Math.max(it.total-it.done,0);
+      const daysLeft = daysBetween(today(), it.due);
+      const overdue = !it.completed && !locked && daysLeft<0;
+      const effDays = Math.max(daysLeft,1);
+      const dt = it.dailyTarget;
+      const progressToday = dt ? Math.max(it.done - dt.startDone, 0) : 0;
+      const remainingToday = dt ? Math.max(dt.amt - progressToday, 0) : 0;
+      const metToday = !!(dt && dt.amt>0 && remainingToday<=0);
+      const tomorrowDaysLeft = Math.max(daysBetween(addDays(today(),1), it.due), 1);
+      const tomorrowTarget = left>0 ? Math.ceil(left/tomorrowDaysLeft) : 0;
+      const pct = Math.min(100, Math.round((it.done/it.total)*100));
+      const unit = it.unit || 'units';
+      const cardCourseColor = it.course ? courseColor(it.course) : null;
+      const cls = locked ? 'pl-locked' : urgencyClass(daysLeft, it.completed);
+      const statusText = it.completed ? 'Completed'
+        : locked ? `<span class="pl-waiting">Waiting on: ${it.dependsOn}</span>`
+        : overdue ? `<span class="pl-overdue-text">Overdue by ${Math.abs(daysLeft)} day${Math.abs(daysLeft)===1?'':'s'}</span>`
+        : requiredItemSet.has(it)
+          ? (it.total<=1 ? `Due ${relativeDueLabel(it.due)}` : (metToday ? tomorrowTarget+' '+unitLabel(tomorrowTarget,unit)+' tomorrow' : remainingToday+' '+unitLabel(remainingToday,unit)+'/day'))
+          : (it.total<=1)
+            ? (left<=0 ? 'Done' : 'Available')
+            : (left<=0 ? 'Done'
+               : metToday ? tomorrowTarget+' '+unitLabel(tomorrowTarget,unit)+' tomorrow'
+               : remainingToday+' '+unitLabel(remainingToday,unit)+'/day');
+      html += `<div class="pl-card ${it.completed?'pl-done':''} ${cls}" id="pl-card-${i}" data-i="${i}">
+        <div class="pl-card-head">
+          ${sortMode==='custom'? `<span class="pl-drag-handle" draggable="true" data-i="${i}" title="Drag to reorder" aria-hidden="true">\u2837</span>` : ''}
+          <div style="flex:1;">
+            ${it.course? `<span class="pl-tag" style="background:${cardCourseColor};color:${contrastTextColor(cardCourseColor)}">${it.course}</span>` : ''}
+            ${it.archived? `<span class="pl-tag" style="background:#555;">Archived</span>` : ''}
+            <div><b>${it.title}</b>${it.recurring? `<span class="pl-recurring-tag">\u21bb ${it.recurring}</span>` : ''}</div>
+            ${it.notes? `<div class="pl-notes">${linkifyNotes(it.notes)}</div>` : ''}
+            ${it.subtasks && it.subtasks.length? `<div class="pl-subtasks">${it.subtasks.map((s,si)=>`<label class="pl-subtask-row"><input type="checkbox" class="pl-subtask-toggle" data-i="${i}" data-si="${si}" ${s.done?'checked':''}><span style="${s.done?'text-decoration:line-through;opacity:0.6;':''}">${s.text}</span></label>`).join('')}</div>` : ''}
+          </div>
+        </div>
+        <div class="pl-row"><span title="${it.due}">Due ${relativeDueLabel(it.due)}</span><span>${statusText}</span></div>
+        <div class="pl-bar"><div class="pl-fill" data-fill-key="${i}" style="width:${pct}%"></div></div>
+        <div class="pl-row pl-actions-row">
+          <span>${it.total>1 ? fmt(it.done)+'/'+fmt(it.total)+' '+unit : capUnit(unit)}</span>
+          <span class="pl-actions">
+            ${sortMode==='custom'? `<button data-pos="${pos}" class="pl-move-up pl-secondary" aria-label="Move up" ${pos===0?'disabled':''}>\u2191</button><button data-pos="${pos}" class="pl-move-down pl-secondary" aria-label="Move down" ${pos===list.length-1?'disabled':''}>\u2193</button>` : ''}
+            ${(!it.completed && !locked && it.total>1)? `<button data-i="${i}" class="pl-log">+1</button>` : ''}
+            ${!locked? `<button data-i="${i}" class="pl-complete">${it.completed? 'Reopen':'Complete'}</button>` : ''}
+            <button data-i="${i}" class="pl-edit pl-secondary">Edit</button>
+            <button data-i="${i}" class="pl-del pl-danger">Delete</button>
+          </span>
+        </div>
+      </div>`;
+    });
+
+    html += `<div class="pl-io">
+      <details class="pl-export-dropdown">
+        <summary>Export \u25be</summary>
+        <div class="pl-dropdown-panel">
+          <button id="pl-export" class="pl-secondary">Backup (JSON)</button>
+          <button id="pl-export-ics" class="pl-secondary">Calendar (.ics)</button>
+        </div>
+      </details>
+      <label style="display:inline-block;">
+        <button id="pl-import-btn" class="pl-secondary">Import Backup</button>
+        <input type="file" id="pl-import" accept="application/json" style="display:none;">
+      </label>
+      <button id="pl-clear-completed" class="pl-danger">Clear Completed</button>
+    </div>`;
+
+    html += `<div class="pl-controls">
+      <label><input type="checkbox" id="pl-show-completed" style="width:auto;" ${!hideDone?'checked':''}> Show completed</label>
+      <label><input type="checkbox" id="pl-show-archived" style="width:auto;" ${showArchived?'checked':''}> Show archived</label>
+    </div>`;
+
+    html += `<div class="pl-bottom-row">
+      <label>Theme: <select id="pl-theme-select">
+        <option value="dark" ${theme==='dark'?'selected':''}>Dark</option>
+        <option value="light" ${theme==='light'?'selected':''}>Light</option>
+        <option value="blue" ${theme==='blue'?'selected':''}>Blue (classic)</option>
+        <option value="auto" ${theme==='auto'?'selected':''}>Auto (system)</option>
+      </select></label>
+      <button id="pl-manage-courses" type="button" class="pl-secondary">Manage Courses</button>
+      <button id="pl-sync-btn" type="button" class="pl-secondary">${window.plSyncLabel || 'Sign in to sync'}</button>
+      ${('Notification' in window) ? (
+        Notification.permission==='granted'
+          ? `<span style="font-size:12px;">Reminders: On</span>`
+          : Notification.permission==='denied'
+            ? `<span style="font-size:12px;">Reminders blocked in browser settings</span>`
+            : `<button id="pl-enable-notify" class="pl-secondary">Enable Reminders</button>`
+      ) : ''}
+    </div>`;
+
+    if(devMode){
+      html += `<button id="pl-dev-toolbar-btn" type="button">🛠️ Dev Menu</button>
+      <div id="pl-dev-toolbar-panel" style="display:${devPanelOpen ? 'block' : 'none'};">
+        <h4>Dev Testing Controls</h4>
+        <button type="button" id="pl-dev-trigger-notify">🔔 Trigger Test Notification</button>
+        <button type="button" id="pl-dev-advance-1">⏩ Advance Time +1 Day</button>
+        <button type="button" id="pl-dev-advance-7">⏩ Advance Time +7 Days</button>
+        <button type="button" id="pl-dev-reset">⚠️ Hard Reset Everything</button>
+        <div id="pl-dev-reset-confirm" style="display:none;font-size:12px;margin-top:4px;">
+          <span>This clears all data. </span>
+          <button type="button" id="pl-dev-reset-confirm-yes">Confirm reset</button>
+          <button type="button" id="pl-dev-reset-confirm-no">Cancel</button>
+        </div>
+        <button type="button" id="pl-dev-exit">🚪 Exit Dev Mode</button>
+      </div>`;
+    }
+
+    if(showCourseManager){
+      const courseNames = [...new Set(items.map(i=>(i.course||'').trim()).filter(Boolean))];
+      html += `<div class="pl-course-manager" id="pl-course-manager">`;
+      if(courseNames.length===0){
+        html += `<div style="font-size:12.5px;color:var(--pl-muted);">No courses yet.</div>`;
+      } else {
+        courseNames.forEach(c=>{
+          html += `<div class="pl-course-row">
+            <input type="text" class="pl-course-rename" data-course="${c}" value="${c}">
+            <input type="color" class="pl-course-color" data-course="${c}" value="${courseColor(c)}">
+          </div>`;
+        });
+      }
+      html += `</div>`;
+    }
+
+    if(editIndex!==null || showForm){
+      html += `<div id="pl-modal-backdrop">
+        <div id="pl-modal-box" role="dialog" aria-modal="true" aria-label="${editIndex!==null? 'Edit Assignment' : 'Add Assignment'}">
+          <button id="pl-modal-close" aria-label="Close">&times;</button>
+          ${formHtml(editIndex!==null ? items[editIndex] : null)}
+        </div>
+      </div>`;
+    }
+
+    html += `<button id="pl-add-toggle" class="pl-fab" aria-label="Add Assignment">+</button>`;
+
+    const prevFills = {};
+    root.querySelectorAll('[data-fill-key]').forEach(el=>{
+      prevFills[el.dataset.fillKey] = el.style.width;
+    });
+    const prevCardOpacity = {};
+    root.querySelectorAll('.pl-card[id^="pl-card-"]').forEach(el=>{
+      prevCardOpacity[el.id] = getComputedStyle(el).opacity;
+    });
+    const prevTodayBodyEl = root.querySelector('.pl-today-body-anim');
+    const prevTodayBodyHeight = (pendingTodayAnim && prevTodayBodyEl) ? prevTodayBodyEl.getBoundingClientRect().height : null;
+    const prevTodayBodyHTML = (pendingTodayAnim && prevTodayBodyEl) ? prevTodayBodyEl.innerHTML : null;
+
+    root.innerHTML = html;
+
+    const streakDismissBtn = document.getElementById('pl-streak-dismiss');
+    if(streakDismissBtn){
+      streakDismissBtn.onclick = ()=>{
+        dismissDailyStreakNotice();
+        render();
+      };
+    }
+
+    if(celebrationPending){
+      const c = celebrationPending;
+      celebrationPending = null;
+      requestAnimationFrame(()=> burstConfetti(c.x, c.y, {big: c.big}));
+    }
+
+    root.querySelectorAll('[data-fill-key]').forEach(el=>{
+      const key = el.dataset.fillKey;
+      const newWidth = el.style.width;
+      if(prevFills[key] !== undefined && prevFills[key] !== newWidth){
+        el.style.width = prevFills[key];
+        void el.offsetWidth;
+        requestAnimationFrame(()=>{ el.style.width = newWidth; });
+      }
+    });
+
+    const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if(!reducedMotion){
+      root.querySelectorAll('.pl-card[id^="pl-card-"]').forEach(el=>{
+        const prev = prevCardOpacity[el.id];
+        if(prev === undefined) return;
+        const target = getComputedStyle(el).opacity;
+        if(prev !== target){
+          el.style.opacity = prev;
+          void el.offsetWidth;
+          requestAnimationFrame(()=>{ el.style.opacity = target; });
+        }
+      });
+    }
+    if(prevTodayBodyHeight!==null && !reducedMotion){
+      const newBodyEl = root.querySelector('.pl-today-body-anim');
+      if(newBodyEl){
+        const newHeight = newBodyEl.getBoundingClientRect().height;
+        // The compact and expanded bodies share the same markup for the
+        // required-items prefix, so there's no need to crossfade text.
+        if(newHeight < prevTodayBodyHeight && prevTodayBodyHTML!==null){
+          // Closing: the real (compact) content is already in the DOM, but
+          // it's shorter than what was on screen, so shrinking around it
+          // would just close a blank gap instead of clipping the outgoing
+          // rows away. Show the old (taller) content while the box shrinks,
+          // then swap in the real compact content once it's fully hidden.
+          const newHTML = newBodyEl.innerHTML;
+          newBodyEl.innerHTML = prevTodayBodyHTML;
+          newBodyEl.style.height = prevTodayBodyHeight+'px';
+          void newBodyEl.offsetWidth;
+          newBodyEl.style.transition = 'height 0.3s ease';
+          requestAnimationFrame(()=>{
+            newBodyEl.style.height = newHeight+'px';
+          });
+          newBodyEl.addEventListener('transitionend', function handler(e){
+            if(e.propertyName!=='height') return;
+            newBodyEl.innerHTML = newHTML;
+            newBodyEl.style.height = '';
+            newBodyEl.style.transition = '';
+            newBodyEl.removeEventListener('transitionend', handler);
+          });
+        } else {
+          // Opening (or same height): the new, taller content is already in
+          // the DOM - just grow into it so the extra rows are revealed as
+          // space allows.
+          newBodyEl.style.height = prevTodayBodyHeight+'px';
+          void newBodyEl.offsetWidth;
+          newBodyEl.style.transition = 'height 0.3s ease';
+          requestAnimationFrame(()=>{
+            newBodyEl.style.height = newHeight+'px';
+          });
+          newBodyEl.addEventListener('transitionend', function handler(e){
+            if(e.propertyName!=='height') return;
+            newBodyEl.style.height = '';
+            newBodyEl.style.transition = '';
+            newBodyEl.removeEventListener('transitionend', handler);
+          });
+        }
+      }
+    }
+    pendingTodayAnim = false;
+
+    const addToggle = document.getElementById('pl-add-toggle');
+    if(addToggle) addToggle.onclick = ()=>{ showForm = true; render(); };
+
+    const modalBackdrop = document.getElementById('pl-modal-backdrop');
+    if(modalBackdrop){
+      modalBackdrop.addEventListener('click', (e)=>{
+        if(e.target === modalBackdrop){ editIndex=null; showForm=false; render(); }
+      });
+    }
+    const modalClose = document.getElementById('pl-modal-close');
+    if(modalClose) modalClose.onclick = ()=>{ editIndex=null; showForm=false; render(); };
+
+    document.getElementById('pl-export').onclick = exportData;
+    document.getElementById('pl-export-ics').onclick = exportIcs;
+    document.getElementById('pl-import-btn').onclick = ()=> document.getElementById('pl-import').click();
+    document.getElementById('pl-import').onchange = (e)=>{
+      if(e.target.files[0]) importData(e.target.files[0]);
+    };
+
+    const courseField = document.getElementById('pl-course');
+    if(courseField){
+      courseField.addEventListener('input', (e)=>{
+        const dependsSelect = document.getElementById('pl-depends');
+        const existing = editIndex!==null ? items[editIndex] : null;
+        dependsSelect.innerHTML = dependsOptionsHtml(e.target.value, '', existing);
+      });
+    }
+
+    const dueInput = document.getElementById('pl-due');
+    if(dueInput){
+      const wrap = dueInput.closest('.pl-date-wrap');
+      const syncDatePlaceholder = ()=>{
+        if(wrap) wrap.classList.toggle('pl-has-date', !!dueInput.value);
+      };
+      syncDatePlaceholder();
+      dueInput.addEventListener('input', syncDatePlaceholder);
+      dueInput.addEventListener('change', syncDatePlaceholder);
+    }
+
+    const saveBtn = document.getElementById('pl-save');
+    if(saveBtn){
+      saveBtn.onclick = ()=>{
+        const title = document.getElementById('pl-title').value.trim();
+        const course = document.getElementById('pl-course').value.trim();
+        const due = document.getElementById('pl-due').value;
+        const unitsRaw = document.getElementById('pl-units').value.trim();
+        const total = unitsRaw ? parseFloat(unitsRaw) : 1;
+        const unit = document.getElementById('pl-unitlabel').value.trim() || 'Assignment';
+        const notes = document.getElementById('pl-notes').value.trim();
+        const dependsOn = document.getElementById('pl-depends').value;
+        const recurring = document.getElementById('pl-recurring').value;
+        const subtaskLines = document.getElementById('pl-subtasks').value.split('\n').map(s=>s.trim()).filter(Boolean);
+        const titleEl = document.getElementById('pl-title');
+        const dueEl = document.getElementById('pl-due');
+        const dueWrap = dueEl ? dueEl.closest('.pl-date-wrap') : null;
+        [titleEl,dueEl].forEach(el=>{ if(el) el.classList.remove('pl-field-error'); });
+        if(dueWrap) dueWrap.classList.remove('pl-field-error');
+        const missing = [];
+        if(!title) missing.push(titleEl);
+        if(!due) missing.push(dueEl);
+        if(missing.length){
+          missing.forEach(el=>{
+            if(el === dueEl && dueWrap) dueWrap.classList.add('pl-field-error');
+            else el.classList.add('pl-field-error');
+          });
+          missing[0].focus();
+          return;
+        }
+        const prevSubtasks = (editIndex!==null && items[editIndex].subtasks) || [];
+        const subtasks = subtaskLines.map(text=>{
+          const prev = prevSubtasks.find(s=>s.text===text);
+          return { text, done: prev ? prev.done : false };
+        });
+        if(editIndex!==null){
+          const it = items[editIndex];
+          it.title=title; it.course=course; it.due=due; it.total=total; it.unit=unit; it.notes=notes;
+          it.dependsOn=dependsOn; it.recurring=recurring; it.subtasks=subtasks;
+          it.done = Math.min(it.done, total);
+          if(isDevModeTrigger(it.title, it.total)) activateDevMode();
+          editIndex = null;
+        } else {
+          const maxOrder = items.reduce((m,x)=> Math.max(m, x.order ?? -1), -1);
+          items.push({title,course,due,total,unit,notes,done:0,completed:false,dependsOn,recurring,subtasks,completedAt:null,createdAt:today(),archived:false,order:maxOrder+1});
+          if(isDevModeTrigger(title, total)) activateDevMode();
+          pendingScrollId = 'pl-card-'+(items.length-1);
+          pendingScrollAlign = 'top';
+        }
+        showForm = false;
+        save();
+      };
+    }
+    const cancelBtn = document.getElementById('pl-cancel');
+    if(cancelBtn) cancelBtn.onclick = ()=>{ editIndex=null; showForm=false; render(); };
+
+    const modalBox = document.getElementById('pl-modal-box');
+    if(modalBox && saveBtn){
+      modalBox.addEventListener('keydown', (e)=>{
+        if(e.key==='Enter' && e.target.tagName==='INPUT'){
+          e.preventDefault();
+          saveBtn.click();
+        }
+      });
+    }
+
+    document.getElementById('pl-sort').onchange = (e)=>{ sortMode=e.target.value; savePrefs(); render(); };
+    const todayToggleBtn = document.getElementById('pl-today-toggle');
+    if(todayToggleBtn) todayToggleBtn.onclick = ()=>{
+      todayExpanded = !todayExpanded;
+      pendingTodayAnim = true;
+      savePrefs();
+      render();
+    };
+    const todayCard = document.getElementById('pl-today-card');
+    if(todayCard) todayCard.addEventListener('click', (e)=>{
+      // Ignore clicks on the toggle button or on rows that have their own
+      // click behavior (scroll-to-card) — only empty space toggles.
+      if(e.target.closest('#pl-today-toggle') || e.target.closest('.pl-today-clickable')) return;
+      todayExpanded = !todayExpanded;
+      pendingTodayAnim = true;
+      savePrefs();
+      render();
+    });
+    document.getElementById('pl-show-completed').onchange = (e)=>{ hideDone = !e.target.checked; savePrefs(); render(); };
+    document.getElementById('pl-show-archived').onchange = (e)=>{ showArchived = e.target.checked; savePrefs(); render(); };
+    document.getElementById('pl-filter').oninput = (e)=>{
+      pendingFocus = {id:'pl-filter', selStart:e.target.selectionStart, selEnd:e.target.selectionEnd};
+      searchTerm=e.target.value; savePrefs(); render();
+    };
+    const searchClearBtn = document.getElementById('pl-search-clear');
+    if(searchClearBtn) searchClearBtn.onclick = ()=>{
+      searchTerm = '';
+      savePrefs();
+      pendingFocus = {id:'pl-filter', selStart:0, selEnd:0};
+      render();
+    };
+    const overdueBanner = document.getElementById('pl-overdue-banner');
+    if(overdueBanner) overdueBanner.onclick = ()=>{
+      overdueFilterActive = !overdueFilterActive;
+      render();
+    };
+    const clearFiltersBtn = document.getElementById('pl-clear-filters');
+    if(clearFiltersBtn) clearFiltersBtn.onclick = ()=>{
+      searchTerm = '';
+      hideDone = false;
+      overdueFilterActive = false;
+      savePrefs();
+      render();
+    };
+    document.getElementById('pl-theme-select').onchange = (e)=>{
+      theme = e.target.value;
+      applyTheme();
+      savePrefs();
+      render();
+    };
+    document.getElementById('pl-clear-completed').onclick = clearCompleted;
+
+    const devToolbarBtn = document.getElementById('pl-dev-toolbar-btn');
+    if(devToolbarBtn){
+      devToolbarBtn.onclick = ()=>{
+        devPanelOpen = !devPanelOpen;
+        saveDevPanelOpen();
+        render();
+      };
+    }
+    const devTriggerNotify = document.getElementById('pl-dev-trigger-notify');
+    if(devTriggerNotify){
+      devTriggerNotify.onclick = ()=>{
+        if (!('Notification' in window)) {
+          alert('This browser does not support desktop notifications.');
+          return;
+        }
+        Notification.requestPermission().then(permission => {
+          if (permission === 'granted') {
+            new Notification('🧪 Dev ping', { body: 'A little planner nudge just for testing ✨', icon: 'icons/icon-192.png' });
+          } else {
+            alert('Notification permission denied.');
+          }
+        });
+      };
+    }
+    const devAdvance1 = document.getElementById('pl-dev-advance-1');
+    if(devAdvance1){
+      devAdvance1.onclick = ()=>{
+        const offset = Number(localStorage.getItem(DAY_OFFSET_KEY) || 0);
+        localStorage.setItem(DAY_OFFSET_KEY, String(offset + 1));
+        alert('Simulated moving forward 1 day. Reloading...');
+        location.reload();
+      };
+    }
+    const devAdvance7 = document.getElementById('pl-dev-advance-7');
+    if(devAdvance7){
+      devAdvance7.onclick = ()=>{
+        const offset = Number(localStorage.getItem(DAY_OFFSET_KEY) || 0);
+        localStorage.setItem(DAY_OFFSET_KEY, String(offset + 7));
+        alert('Simulated moving forward 7 days. Reloading...');
+        location.reload();
+      };
+    }
+    const devReset = document.getElementById('pl-dev-reset');
+    const devResetConfirm = document.getElementById('pl-dev-reset-confirm');
+    if(devReset && devResetConfirm){
+      // Uses an in-page confirm instead of window.confirm() - native dialogs
+      // are blocked in sandboxed iframe previews (e.g. Claude's artifact
+      // viewer), which silently no-ops this button there.
+      devReset.onclick = ()=>{
+        devResetConfirm.style.display = 'block';
+      };
+      const yesBtn = document.getElementById('pl-dev-reset-confirm-yes');
+      const noBtn = document.getElementById('pl-dev-reset-confirm-no');
+      if(yesBtn) yesBtn.onclick = ()=>{
+        localStorage.clear();
+        sessionStorage.clear();
+        location.reload();
+      };
+      if(noBtn) noBtn.onclick = ()=>{
+        devResetConfirm.style.display = 'none';
+      };
+    }
+    const devExit = document.getElementById('pl-dev-exit');
+    if(devExit){
+      devExit.onclick = ()=>{
+        deactivateDevMode();
+        render();
+      };
+    }
+
+    const manageBtn = document.getElementById('pl-manage-courses');
+    if(manageBtn) manageBtn.onclick = ()=>{
+      showCourseManager = !showCourseManager;
+      if(showCourseManager){ pendingScrollId = 'pl-course-manager'; pendingScrollAlign = 'end'; }
+      render();
+    };
+
+    const notifyBtn = document.getElementById('pl-enable-notify');
+    if(notifyBtn) notifyBtn.onclick = ()=>{
+      Notification.requestPermission().then(perm=>{
+        if(perm==='granted') checkAndNotify();
+        render();
+      });
+    };
+
+    root.querySelectorAll('.pl-course-color').forEach(inp=>{
+      inp.onchange = ()=>{
+        const key = inp.dataset.course.trim().toLowerCase();
+        courseColors[key] = inp.value;
+        saveCourseColors();
+        render();
+      };
+    });
+    root.querySelectorAll('.pl-course-rename').forEach(inp=>{
+      inp.addEventListener('change', ()=>{
+        const oldName = inp.dataset.course;
+        const newName = inp.value.trim();
+        if(newName && newName!==oldName) renameCourse(oldName, newName);
+      });
+    });
+
+    root.querySelectorAll('.pl-today-clickable[data-item-i]').forEach(row=>{
+      row.onclick = ()=>{
+        const targetId = 'pl-card-'+row.dataset.itemI;
+        if(!scrollToAndHighlight(targetId, 'top')){
+          // Probably hidden by an active search filter — clear it and retry after re-render.
+          if(searchTerm){ searchTerm = ''; savePrefs(); }
+          pendingScrollId = targetId;
+          pendingScrollAlign = 'top';
+          render();
+        }
+      };
+    });
+
+    root.querySelectorAll('.pl-subtask-toggle').forEach(cb=>cb.onchange=()=>{
+      const it = items[cb.dataset.i];
+      it.subtasks[cb.dataset.si].done = cb.checked;
+      save();
+    });
+
+    root.querySelectorAll('.pl-log').forEach(b=>b.onclick=()=>{
+      const it = items[b.dataset.i];
+      const workBefore = hasTodayWorkRemaining();
+      const dt = it.dailyTarget;
+      const progressBeforeToday = dt ? Math.max(it.done - dt.startDone, 0) : 0;
+      it.done = Math.min(it.done+1, it.total);
+      const progressAfterToday = dt ? Math.max(it.done - dt.startDone, 0) : 0;
+      const reachedDailyTarget = !!dt && dt.amt>0 && progressBeforeToday < dt.amt && progressAfterToday >= dt.amt;
+      const fullyCompleted = it.done>=it.total && !it.completed;
+      if(fullyCompleted){
+        it.completed = true;
+        it.completedAt = today();
+        if(it.recurring) items.push(makeRecurringClone(it));
+      }
+      if(fullyCompleted || reachedDailyTarget){
+        const rect = b.getBoundingClientRect();
+        const workAfter = hasTodayWorkRemaining();
+        if(workBefore && !workAfter){
+          triggerCelebration(window.innerWidth/2, window.innerHeight*0.25, true);
+        } else {
+          triggerCelebration(rect.left + rect.width/2, rect.top + rect.height/2, false);
+        }
+      }
+      save();
+    });
+    root.querySelectorAll('.pl-move-up').forEach(b=>b.onclick=()=>{
+      const pos = parseInt(b.dataset.pos);
+      if(pos<=0) return;
+      const curr = list[pos].it, prev = list[pos-1].it;
+      const tmp = curr.order; curr.order = prev.order; prev.order = tmp;
+      save();
+    });
+    root.querySelectorAll('.pl-move-down').forEach(b=>b.onclick=()=>{
+      const pos = parseInt(b.dataset.pos);
+      if(pos>=list.length-1) return;
+      const curr = list[pos].it, next = list[pos+1].it;
+      const tmp = curr.order; curr.order = next.order; next.order = tmp;
+      save();
+    });
+
+    root.querySelectorAll('.pl-drag-handle').forEach(handle=>{
+      handle.addEventListener('dragstart', (e)=>{
+        dragSrcIndex = parseInt(handle.dataset.i);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', String(dragSrcIndex));
+        const card = handle.closest('.pl-card');
+        if(card) card.classList.add('pl-dragging');
+      });
+      handle.addEventListener('dragend', ()=>{
+        root.querySelectorAll('.pl-card.pl-dragging').forEach(c=>c.classList.remove('pl-dragging'));
+        root.querySelectorAll('.pl-card.pl-drop-target').forEach(c=>c.classList.remove('pl-drop-target'));
+        dragSrcIndex = null;
+      });
+    });
+    root.querySelectorAll('.pl-card[data-i]').forEach(card=>{
+      card.addEventListener('dragover', (e)=>{
+        if(dragSrcIndex===null) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        card.classList.add('pl-drop-target');
+      });
+      card.addEventListener('dragleave', ()=>{
+        card.classList.remove('pl-drop-target');
+      });
+      card.addEventListener('drop', (e)=>{
+        e.preventDefault();
+        card.classList.remove('pl-drop-target');
+        const targetIdx = parseInt(card.dataset.i);
+        if(dragSrcIndex===null || targetIdx===dragSrcIndex) return;
+        reorderByDrag(dragSrcIndex, targetIdx, list);
+        dragSrcIndex = null;
+      });
+    });
+    root.querySelectorAll('.pl-edit').forEach(b=>b.onclick=()=>{
+      editIndex = parseInt(b.dataset.i); pendingFocus = 'none'; render();
+    });
+    root.querySelectorAll('.pl-complete').forEach(b=>b.onclick=()=>{
+      const it = items[b.dataset.i];
+      const completing = !it.completed;
+      const workBefore = hasTodayWorkRemaining();
+      it.completed = !it.completed;
+      if(it.completed){
+        it.done = it.total;
+        it.completedAt = today();
+        if(it.recurring) items.push(makeRecurringClone(it));
+      } else {
+        it.completedAt = null;
+        it.archived = false;
+      }
+      if(completing){
+        const rect = b.getBoundingClientRect();
+        const workAfter = hasTodayWorkRemaining();
+        if(workBefore && !workAfter){
+          triggerCelebration(window.innerWidth/2, window.innerHeight*0.25, true);
+        } else {
+          triggerCelebration(rect.left + rect.width/2, rect.top + rect.height/2, false);
+        }
+      }
+      save();
+    });
+    root.querySelectorAll('.pl-del').forEach(b=>b.onclick=()=>{
+      deleteItemAt(parseInt(b.dataset.i));
+    });
+
+    // Restore focus to whatever the user was interacting with before this render.
+    if(pendingFocus === 'title'){
+      const t = document.getElementById('pl-title');
+      if(t) t.focus();
+    } else if(pendingFocus){
+      const el = document.getElementById(pendingFocus.id);
+      if(el){
+        el.focus();
+        if(pendingFocus.selStart!=null && el.setSelectionRange){
+          try{ el.setSelectionRange(pendingFocus.selStart, pendingFocus.selEnd); }catch(e){}
+        }
+      }
+    }
+    pendingFocus = null;
+
+    if(pendingScrollId){
+      scrollToAndHighlight(pendingScrollId, pendingScrollAlign);
+      pendingScrollId = null;
+      pendingScrollAlign = 'end';
+    }
+
+    root.querySelectorAll('details.pl-export-dropdown').forEach(d=>{
+      d.addEventListener('toggle', ()=>{
+        if(!d.open) return;
+        requestAnimationFrame(()=>{
+          const panel = d.querySelector('.pl-dropdown-panel');
+          if(!panel) return;
+          const overflow = panel.getBoundingClientRect().bottom - window.innerHeight;
+          if(overflow > 0) window.scrollBy({top: overflow + 16, behavior:'smooth'});
+        });
+      });
+    });
+
+  }
+  render();
+})();
