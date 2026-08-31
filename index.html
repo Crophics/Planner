@@ -1546,6 +1546,7 @@ if ('serviceWorker' in navigator) {
     });
     const prevTodayBodyEl = root.querySelector('.pl-today-body-anim');
     const prevTodayBodyHeight = (pendingTodayAnim && prevTodayBodyEl) ? prevTodayBodyEl.getBoundingClientRect().height : null;
+    const prevTodayBodyHTML = (pendingTodayAnim && prevTodayBodyEl) ? prevTodayBodyEl.innerHTML : null;
 
     root.innerHTML = html;
 
@@ -1589,24 +1590,47 @@ if ('serviceWorker' in navigator) {
     if(prevTodayBodyHeight!==null && !reducedMotion){
       const newBodyEl = root.querySelector('.pl-today-body-anim');
       if(newBodyEl){
-        // The compact and expanded bodies share the same markup for the
-        // required-items prefix - only the tail (pick-bucket summary vs full
-        // optional-bucket detail) differs. So there's nothing to crossfade:
-        // just animate the height and let overflow:hidden reveal/hide the
-        // tail naturally, the same way any accordion would.
         const newHeight = newBodyEl.getBoundingClientRect().height;
-        newBodyEl.style.height = prevTodayBodyHeight+'px';
-        void newBodyEl.offsetWidth;
-        newBodyEl.style.transition = 'height 0.3s ease';
-        requestAnimationFrame(()=>{
-          newBodyEl.style.height = newHeight+'px';
-        });
-        newBodyEl.addEventListener('transitionend', function handler(e){
-          if(e.propertyName!=='height') return;
-          newBodyEl.style.height = '';
-          newBodyEl.style.transition = '';
-          newBodyEl.removeEventListener('transitionend', handler);
-        });
+        // The compact and expanded bodies share the same markup for the
+        // required-items prefix, so there's no need to crossfade text.
+        if(newHeight < prevTodayBodyHeight && prevTodayBodyHTML!==null){
+          // Closing: the real (compact) content is already in the DOM, but
+          // it's shorter than what was on screen, so shrinking around it
+          // would just close a blank gap instead of clipping the outgoing
+          // rows away. Show the old (taller) content while the box shrinks,
+          // then swap in the real compact content once it's fully hidden.
+          const newHTML = newBodyEl.innerHTML;
+          newBodyEl.innerHTML = prevTodayBodyHTML;
+          newBodyEl.style.height = prevTodayBodyHeight+'px';
+          void newBodyEl.offsetWidth;
+          newBodyEl.style.transition = 'height 0.3s ease';
+          requestAnimationFrame(()=>{
+            newBodyEl.style.height = newHeight+'px';
+          });
+          newBodyEl.addEventListener('transitionend', function handler(e){
+            if(e.propertyName!=='height') return;
+            newBodyEl.innerHTML = newHTML;
+            newBodyEl.style.height = '';
+            newBodyEl.style.transition = '';
+            newBodyEl.removeEventListener('transitionend', handler);
+          });
+        } else {
+          // Opening (or same height): the new, taller content is already in
+          // the DOM - just grow into it so the extra rows are revealed as
+          // space allows.
+          newBodyEl.style.height = prevTodayBodyHeight+'px';
+          void newBodyEl.offsetWidth;
+          newBodyEl.style.transition = 'height 0.3s ease';
+          requestAnimationFrame(()=>{
+            newBodyEl.style.height = newHeight+'px';
+          });
+          newBodyEl.addEventListener('transitionend', function handler(e){
+            if(e.propertyName!=='height') return;
+            newBodyEl.style.height = '';
+            newBodyEl.style.transition = '';
+            newBodyEl.removeEventListener('transitionend', handler);
+          });
+        }
       }
     }
     pendingTodayAnim = false;
