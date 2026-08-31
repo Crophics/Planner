@@ -662,8 +662,8 @@ if ('serviceWorker' in navigator) {
       const key = t+'|'+it.title;
       if(!logSet.has(key)){
         const when = it.due===t ? 'today' : 'tomorrow';
-        const title = it.due===t ? `✨ ${it.title} is due today` : `⏰ ${it.title} is due tomorrow`;
-        const body = (it.course ? it.course + ' • ' : '') + (it.due===t ? 'Time to get this one moving ✨' : 'This one is coming up soon 🌟');
+        const title = it.due===t ? `${it.title} is due today` : `${it.title} is due tomorrow`;
+        const body = (it.course ? it.course + ' • ' : '') + (it.due===t ? 'Wrap this up today.' : 'Plan some time for this tomorrow.');
         new Notification(title, {
           body,
           icon: 'icons/icon-192.png'
