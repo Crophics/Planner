@@ -253,6 +253,10 @@ body, #pl-app .pl-today, #pl-app .pl-week-block, #pl-modal-box, #pl-app input, #
 #pl-modal-box{background:var(--pl-modal-bg);color:var(--pl-fg);border-radius:12px;padding:20px;max-width:420px;width:100%;max-height:90vh;overflow-y:auto;position:relative;box-shadow:0 10px 40px var(--pl-modal-shadow);animation:pl-modal-pop 0.22s cubic-bezier(.22,.9,.32,1.2);}
 #pl-modal-box input:not([type="date"]),#pl-modal-box select{padding:12px 10px;}
 #pl-modal-box input[type="date"]{padding-left:10px;padding-right:10px;width:100% !important;max-width:100% !important;box-sizing:border-box !important;margin-left:0 !important;margin-right:0 !important;}
+#pl-app .pl-date-field{padding:12px 10px;border-radius:6px;border:1px solid var(--pl-border);background:var(--pl-input-bg);color:var(--pl-fg);font-size:16px;cursor:pointer;margin-bottom:8px;}
+#pl-app .pl-date-field.pl-date-placeholder{color:var(--pl-muted);}
+#pl-app .pl-date-field.pl-field-error{border-color:#d94535;}
+#pl-app .pl-date-input-hidden{position:absolute;width:1px;height:1px;padding:0;margin:0;border:0;opacity:0;overflow:hidden;pointer-events:none;}
 @keyframes pl-fade-in{ from{ opacity:0; } to{ opacity:1; } }
 @keyframes pl-modal-pop{ from{ opacity:0; transform:scale(0.94) translateY(10px); } to{ opacity:1; transform:scale(1) translateY(0); } }
 #pl-modal-close{position:absolute;top:10px;right:14px;background:none;border:none;font-size:24px;line-height:1;color:var(--pl-muted);cursor:pointer;padding:0;margin:0;}
@@ -1424,6 +1428,19 @@ if ('serviceWorker' in navigator) {
       if(e.target.files[0]) importData(e.target.files[0]);
     };
 
+    const dueDisplay = document.getElementById('pl-due-display');
+    const dueInput = document.getElementById('pl-due');
+    if(dueDisplay && dueInput){
+      dueDisplay.onclick = ()=>{
+        if(dueInput.showPicker) dueInput.showPicker();
+        else dueInput.focus();
+      };
+      dueInput.addEventListener('input', ()=>{
+        dueDisplay.textContent = dueInput.value ? fullDateLabel(dueInput.value) : 'Due date';
+        dueDisplay.classList.toggle('pl-date-placeholder', !dueInput.value);
+      });
+    }
+
     const courseField = document.getElementById('pl-course');
     if(courseField){
       courseField.addEventListener('input', (e)=>{
@@ -1447,7 +1464,7 @@ if ('serviceWorker' in navigator) {
         const recurring = document.getElementById('pl-recurring').value;
         const subtaskLines = document.getElementById('pl-subtasks').value.split('\n').map(s=>s.trim()).filter(Boolean);
         const titleEl = document.getElementById('pl-title');
-        const dueEl = document.getElementById('pl-due');
+        const dueEl = document.getElementById('pl-due-display');
         [titleEl,dueEl].forEach(el=>el.classList.remove('pl-field-error'));
         const missing = [];
         if(!title) missing.push(titleEl);
