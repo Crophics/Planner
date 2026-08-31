@@ -165,7 +165,6 @@ body{max-width:680px;margin:40px auto;padding:0 20px;font-family:-apple-system,B
 #pl-app .pl-today-due-hint{color:var(--pl-muted);font-size:10.5px;font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 #pl-app .pl-today{cursor:pointer;}
 #pl-app .pl-today-body-anim{overflow:hidden;position:relative;margin:0 -6px;padding:0 6px;}
-#pl-app .pl-today-body-overlay{position:absolute;top:0;left:0;right:0;transition:opacity 0.3s ease;}
 #pl-app .pl-today-arrow{display:inline-block;font-size:15px;line-height:1;transition:transform 0.3s cubic-bezier(.4,0,.2,1);}
 #pl-app .pl-today-arrow-open{transform:rotate(90deg);}
 #pl-app .pl-week-block{background:var(--pl-card-bg);border-radius:10px;padding:10px 12px 12px;margin-bottom:14px;}
@@ -1547,7 +1546,6 @@ if ('serviceWorker' in navigator) {
     });
     const prevTodayBodyEl = root.querySelector('.pl-today-body-anim');
     const prevTodayBodyHeight = (pendingTodayAnim && prevTodayBodyEl) ? prevTodayBodyEl.getBoundingClientRect().height : null;
-    const prevTodayBodyHTML = (pendingTodayAnim && prevTodayBodyEl) ? prevTodayBodyEl.innerHTML : null;
 
     root.innerHTML = html;
 
@@ -1591,39 +1589,22 @@ if ('serviceWorker' in navigator) {
     if(prevTodayBodyHeight!==null && !reducedMotion){
       const newBodyEl = root.querySelector('.pl-today-body-anim');
       if(newBodyEl){
+        // The compact and expanded bodies share the same markup for the
+        // required-items prefix - only the tail (pick-bucket summary vs full
+        // optional-bucket detail) differs. So there's nothing to crossfade:
+        // just animate the height and let overflow:hidden reveal/hide the
+        // tail naturally, the same way any accordion would.
         const newHeight = newBodyEl.getBoundingClientRect().height;
-
-        // Lay the old content on top as an overlay so it fades out in place,
-        // instead of vanishing the instant the new content replaces it.
-        const overlay = document.createElement('div');
-        overlay.className = 'pl-today-body-overlay';
-        overlay.innerHTML = prevTodayBodyHTML;
-        overlay.style.opacity = '1';
-
-        // New content starts invisible and fades in as the overlay fades out.
-        const newInner = document.createElement('div');
-        while(newBodyEl.firstChild) newInner.appendChild(newBodyEl.firstChild);
-        newInner.style.opacity = '0';
-        newInner.style.transition = 'opacity 0.3s ease';
-        newBodyEl.appendChild(newInner);
-        newBodyEl.appendChild(overlay);
-
         newBodyEl.style.height = prevTodayBodyHeight+'px';
         void newBodyEl.offsetWidth;
         newBodyEl.style.transition = 'height 0.3s ease';
         requestAnimationFrame(()=>{
           newBodyEl.style.height = newHeight+'px';
-          overlay.style.opacity = '0';
-          newInner.style.opacity = '1';
         });
         newBodyEl.addEventListener('transitionend', function handler(e){
           if(e.propertyName!=='height') return;
           newBodyEl.style.height = '';
           newBodyEl.style.transition = '';
-          // Unwrap: move newInner's children back up, drop the wrapper + overlay.
-          while(newInner.firstChild) newBodyEl.appendChild(newInner.firstChild);
-          newInner.remove();
-          overlay.remove();
           newBodyEl.removeEventListener('transitionend', handler);
         });
       }
