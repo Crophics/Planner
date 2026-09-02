@@ -9,6 +9,9 @@ jobs:
   deploy-site:
     runs-on: ubuntu-latest
     name: Deploy static site to Cloudflare
+    environment:
+      name: production
+      url: https://taskplus.cc
     steps:
       - uses: actions/checkout@v4
       - name: Publish to Cloudflare
@@ -21,6 +24,9 @@ jobs:
   deploy-functions:
     runs-on: ubuntu-latest
     name: Deploy functions to Firebase
+    environment:
+      name: firebase-functions
+      url: https://console.firebase.google.com/project/planner-88ab8/functions
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
