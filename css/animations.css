@@ -1,0 +1,38 @@
+/* animations.css — Keyframes and reduced-motion preferences */
+
+@keyframes tp-card-flash{
+  0%{ box-shadow:0 0 0 3px rgba(79,139,116,0.65); }
+  100%{ box-shadow:0 0 0 0 rgba(79,139,116,0); }
+}
+@keyframes tp-card-remove{ to{ opacity:0; transform:translateX(28px) scale(0.96); } }
+@keyframes tp-dot-pulse{ 0%,100%{ opacity:1; } 50%{ opacity:0.45; } }
+@keyframes tp-field-shake{
+  0%,100%{ transform:translateX(0); }
+  25%{ transform:translateX(-4px); }
+  75%{ transform:translateX(4px); }
+}
+@keyframes tp-bar-grow{
+  from{ transform:scaleY(0); }
+  to{ transform:scaleY(1); }
+}
+#tp-app .tp-week-bar, #tp-app .tp-week-bar-stack{
+  transform-origin:bottom;
+}
+@keyframes tp-glass-in{
+  from{ opacity:0; transform:scale(0.96) translateY(-4px); }
+  to{ opacity:1; transform:scale(1) translateY(0); }
+}
+@keyframes tp-fade-in{ from{ opacity:0; } to{ opacity:1; } }
+@keyframes tp-modal-pop{ from{ opacity:0; transform:scale(0.94) translateY(10px); } to{ opacity:1; transform:scale(1) translateY(0); } }
+@keyframes tp-toast-in{ from{ opacity:0; transform:translate(-50%, 12px); } to{ opacity:1; transform:translate(-50%, 0); } }
+@media (prefers-reduced-motion: reduce){
+  #tp-app .tp-today-dot-tight{ animation:none; }
+  #tp-modal-box{ animation:none; }
+  #tp-modal-backdrop{ animation:none; }
+  #tp-app .tp-card.tp-removing{ animation:none; opacity:0; }
+  #tp-toast.tp-toast-anim{ animation:none; }
+  #tp-app .tp-week-bar, #tp-app .tp-week-bar-stack{ animation:none; }
+  #tp-app .tp-card{ transition:none; }
+  #tp-app input.tp-field-error{ animation:none; }
+  body, #tp-app .tp-today, #tp-app .tp-week-block, #tp-modal-box, #tp-app input, #tp-app select, #tp-app textarea, #tp-app .tp-bar, #tp-app .tp-tag{ transition:none; }
+}

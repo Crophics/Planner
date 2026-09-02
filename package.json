@@ -1,0 +1,7 @@
+{
+  "name": "taskplus",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy"
+  }
+}

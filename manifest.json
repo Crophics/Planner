@@ -1,6 +1,6 @@
 {
-  "name": "Planner",
-  "short_name": "Planner",
+  "name": "Taskplus",
+  "short_name": "Taskplus",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

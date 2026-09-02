@@ -1,0 +1,19 @@
+# Windows/NTFS metadata (WSL artifact from browser downloads)
+*:Zone.Identifier
+
+# Dependencies
+node_modules/
+functions/node_modules/
+
+# Build/deploy artifacts
+.wrangler/
+dist/
+build/
+
+# Environment
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db

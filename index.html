@@ -3,15 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Planner</title>
+<title>Taskplus</title>
 <link rel="manifest" href="manifest.json">
-<link rel="icon" href="icons/icon-192.png">
+<link rel="icon" href="icons/icon-192.png" type="image/png" sizes="192x192">
+<link rel="shortcut icon" href="icons/favicon.ico" type="image/x-icon">
 <meta name="theme-color" content="#14161f">
 <script type="module" src="firebase-sync.js"></script>
 <script>
 (function(){
   try{
-    var prefs = JSON.parse(localStorage.getItem('pl-prefs')||'{}');
+    var prefs = JSON.parse(localStorage.getItem('tp-prefs')||'{}');
     var theme = ['dark','light','blue','auto'].includes(prefs.theme) ? prefs.theme : 'blue';
     var eff = theme;
     if(theme==='auto'){
@@ -26,7 +27,21 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div id="pl-app"></div>
-<script src="app.js"></script>
+<div id="tp-app"></div>
+<script src="js/utils.js"></script>
+<script src="js/html.js"></script>
+<script src="js/toast.js"></script>
+<script src="js/theme.js"></script>
+<script src="js/notify.js"></script>
+<script src="js/io.js"></script>
+<script src="js/week-chart.js"></script>
+<script src="js/form.js"></script>
+<script src="js/views/today-html.js"></script>
+<script src="js/views/card-html.js"></script>
+<script src="js/views/chrome-html.js"></script>
+<script src="js/today-logic.js"></script>
+<script src="js/bind-events.js"></script>
+<script src="js/boot.js"></script>
+<script src="js/app.js"></script>
 </body>
 </html>
