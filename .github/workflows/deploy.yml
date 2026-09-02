@@ -22,8 +22,10 @@ jobs:
               - '**'
               - '!functions/**'
               - '!.github/**'
+              - '!**/*.md'
             functions:
               - 'functions/**'
+              - '!functions/**/*.md'
 
   deploy-site:
     needs: changes
