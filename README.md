@@ -74,8 +74,10 @@ Pushing to `main` also triggers a GitHub Actions workflow that does both automat
 
 ### Push notifications
 
-See `FCM-SETUP.md` for the VAPID key setup and enabling the scheduled digest function.
+See [FCM-SETUP.md](./FCM-SETUP.md) for the VAPID key setup and enabling the scheduled digest function. There's also a [functions/README.md](./functions/README.md) with the Cloud Functions specific setup steps.
 
 ## How the digest works
 
 `dailyDueDigest` runs hourly. For each user it checks the current time in their stored timezone against their chosen notify hour (default 8am). Once local time reaches that hour and today's digest hasn't gone out yet, it sends a push with what's due today and tomorrow.
+
+See [functions/index.js](./functions/index.js) for the implementation.
