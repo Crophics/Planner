@@ -3,7 +3,8 @@
   "private": true,
   "scripts": {
     "deploy": "wrangler deploy",
-    "test": "node --test"
+    "test": "node --test",
+    "lint": "eslint js/"
   },
   "devDependencies": {
     "eslint": "^10.9.1"

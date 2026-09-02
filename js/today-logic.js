@@ -1,7 +1,7 @@
 /* today-logic.js — Today's Targets domain logic */
 (function (global) {
   function computeTodayPanel(ctx) {
-    const { items, storageKey: KEY, isLocked, unlockedToday, today, daysBetween, addDays } = ctx;
+    const { items, storageKey: KEY, isLocked, unlockedToday, today, daysBetween } = ctx;
   const active = items.filter(x=>!x.completed && !x.archived && !isLocked(x) && !unlockedToday(x));
   const multi = active.filter(it=>it.total>1);
   const singles = active.filter(it=>it.total<=1 && it.done<it.total);
@@ -102,9 +102,12 @@
   const optionalBucketsFinal = optionalBuckets.filter(b=>!(b.pickCount && b.pickCount===b.entries.length));
   requiredTight = requiredTight.sort((a,b)=> a.it.due.localeCompare(b.it.due));
 
-  const hasRequired = requiredTight.length || requiredPace.length;
+  const hasRequired = requiredTight.length > 0 || requiredPace.length > 0;
   const pickBuckets = optionalBucketsFinal.filter(b=>b.pickCount);
-  const hasPriorAssignmentWork = items.some(it => !it.completed && !it.archived && (it.createdAt ? it.createdAt < today() : it.due < today()));
+  const hasPriorAssignmentWork = items.some(it => !it.archived && (
+  (!it.completed && (it.createdAt ? it.createdAt < today() : it.due < today())) ||
+  (it.completed && it.completedAt === today())
+  ));
   // Matches the "You're all set for today" state shown in the Today panel:
   // nothing required, no must-pick optional buckets, and there was actually
   // something to do today in the first place (so an empty planner doesn't

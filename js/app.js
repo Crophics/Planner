@@ -142,7 +142,6 @@
 
   /* ---- Toast (js/toast.js) ---- */
   const showToast = window.TPToast.show;
-  const hideToast = window.TPToast.hide;
 
   /* ---- Theme ---- */
   function applyTheme(){
@@ -250,14 +249,11 @@
     showToast('Dev mode disabled');
   }
   /* ---- Date / format helpers (from js/utils.js) ---- */
-  const asDate = window.TP.asDate;
   const today = window.TP.today;
   const daysBetween = window.TP.daysBetween;
   const addDays = window.TP.addDays;
-  const addMonths = window.TP.addMonths;
   const nextDueDate = window.TP.nextDueDate;
   const relativeDueLabel = window.TP.relativeDueLabel;
-  const fullDateLabel = window.TP.fullDateLabel;
   const urgencyClass = window.TP.urgencyClass;
   const fmt = window.TP.fmt;
   const unitLabel = window.TP.unitLabel;
@@ -301,10 +297,6 @@
       d = addDays(d, -1);
     }
     return streak;
-  }
-  function completedThisWeek(){
-    const cutoff = addDays(today(),-6);
-    return items.filter(i=>i.completed && i.completedAt && i.completedAt>=cutoff).length;
   }
 
   function autoArchive(){
@@ -456,9 +448,7 @@
   function importData(file){
     window.TPIo.importData(file, (data)=>{ items = data; save(); });
   }
-  const escapeHtml = window.TPHtml.escapeHtml;
   const linkifyNotes = window.TPHtml.linkifyNotes;
-  const icsEscape = window.TPHtml.icsEscape;
 
   function weekChartHtml(summaryText, animate){
     return window.TPWeekChart.weekChartHtml({
@@ -494,7 +484,7 @@
   /* ---- Today's targets (js/today-logic.js) ---- */
   function todayLogicCtx(){
     return {
-      items, storageKey: KEY, isLocked, unlockedToday, today, daysBetween, addDays
+      items, storageKey: KEY, isLocked, unlockedToday, today, daysBetween
     };
   }
   function computeTodayPanel(){
@@ -508,10 +498,12 @@
   /* ---- Render ---- */
   function render(){
     currentColorMap = computeCourseColorMap();
-
     const V = window.TPViews;
+    // Check for day-completion BEFORE computing the streak text below, so
+    // finishing your last task shows the updated streak instantly instead
+    // of waiting until the next render.
+    if(computeTodayPanel().allDoneToday) logDayComplete();
     let html = '';
-
     html += V.topbarHtml({ searchTerm, sortMode });
 
     const overdueCount = items.filter(it=>!it.completed && !it.archived && !isLocked(it) && daysBetween(today(), it.due)<0).length;
@@ -519,7 +511,6 @@
 
     const totalActive = items.filter(i=>!i.completed).length;
     const totalCompleted = items.filter(i=>i.completed).length;
-    const thisWeek = completedThisWeek();
     const streak = currentStreak();
     const streakText = streak > 0 ? `${streak}-day streak 🔥` : '';
     const summaryText = `${totalActive} active \u00b7 ${totalCompleted} completed${streak>0? ' \u00b7 '+streakText : ''}`;
