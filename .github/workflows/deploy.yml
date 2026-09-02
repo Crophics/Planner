@@ -27,8 +27,20 @@ jobs:
             functions:
               - 'functions/**'
 
-  deploy-site:
+  test:
     needs: changes
+    if: needs.changes.outputs.site == 'true'
+    runs-on: ubuntu-latest
+    name: Run tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm test
+
+  deploy-site:
+    needs: [changes, test]
     if: needs.changes.outputs.site == 'true'
     runs-on: ubuntu-latest
     name: Deploy static site to Cloudflare

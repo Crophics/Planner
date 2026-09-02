@@ -2,6 +2,7 @@
   "name": "taskplus",
   "private": true,
   "scripts": {
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "test": "node --test"
   }
 }
