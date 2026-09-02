@@ -2,6 +2,7 @@
 (function (global) {
 function cardHtml(ctx) {
   const { it, i, pos, listLen, sortMode, requiredItemSet, isLocked, daysBetween, today, addDays, urgencyClass, relativeDueLabel, fmt, unitLabel, capUnit, courseColor, contrastTextColor, linkifyNotes } = ctx;
+  const escapeHtml = window.TPHtml.escapeHtml;
   const locked = isLocked(it);
   const left = Math.max(it.total-it.done,0);
   const daysLeft = daysBetween(today(), it.due);
@@ -18,7 +19,7 @@ function cardHtml(ctx) {
   const cardCourseColor = it.course ? courseColor(it.course) : null;
   const cls = locked ? 'tp-locked' : urgencyClass(daysLeft, it.completed);
   const statusText = it.completed ? 'Completed'
-    : locked ? `<span class="tp-waiting">Waiting on: ${it.dependsOn}</span>`
+    : locked ? `<span class="tp-waiting">Waiting on: ${escapeHtml(it.dependsOn)}</span>`
     : overdue ? `<span class="tp-overdue-text">Overdue by ${Math.abs(daysLeft)} day${Math.abs(daysLeft)===1?'':'s'}</span>`
     : requiredItemSet.has(it)
       ? (it.total<=1 ? `Due ${relativeDueLabel(it.due)}` : (metToday ? tomorrowTarget+' '+unitLabel(tomorrowTarget,unit)+' tomorrow' : remainingToday+' '+unitLabel(remainingToday,unit)+'/day'))
@@ -31,11 +32,11 @@ function cardHtml(ctx) {
     <div class="tp-card-head">
       ${sortMode==='custom'? `<span class="tp-drag-handle" draggable="true" data-i="${i}" title="Drag to reorder" aria-hidden="true">\u2837</span>` : ''}
       <div style="flex:1;">
-        ${it.course? `<span class="tp-tag" style="background:${cardCourseColor};color:${contrastTextColor(cardCourseColor)}">${it.course}</span>` : ''}
+        ${it.course? `<span class="tp-tag" style="background:${cardCourseColor};color:${contrastTextColor(cardCourseColor)}">${escapeHtml(it.course)}</span>` : ''}
         ${it.archived? `<span class="tp-tag" style="background:#555;">Archived</span>` : ''}
-        <div><b>${it.title}</b>${it.recurring? `<span class="tp-recurring-tag">\u21bb ${it.recurring}</span>` : ''}</div>
+        <div><b>${escapeHtml(it.title)}</b>${it.recurring? `<span class="tp-recurring-tag">\u21bb ${it.recurring}</span>` : ''}</div>
         ${it.notes? `<div class="tp-notes">${linkifyNotes(it.notes)}</div>` : ''}
-        ${it.subtasks && it.subtasks.length? `<div class="tp-subtasks">${it.subtasks.map((s,si)=>`<label class="tp-subtask-row"><input type="checkbox" class="tp-subtask-toggle" data-i="${i}" data-si="${si}" ${s.done?'checked':''}><span style="${s.done?'text-decoration:line-through;opacity:0.6;':''}">${s.text}</span></label>`).join('')}</div>` : ''}
+        ${it.subtasks && it.subtasks.length? `<div class="tp-subtasks">${it.subtasks.map((s,si)=>`<label class="tp-subtask-row"><input type="checkbox" class="tp-subtask-toggle" data-i="${i}" data-si="${si}" ${s.done?'checked':''}><span style="${s.done?'text-decoration:line-through;opacity:0.6;':''}">${escapeHtml(s.text)}</span></label>`).join('')}</div>` : ''}
       </div>
     </div>
     <div class="tp-row"><span title="${it.due}">Due ${relativeDueLabel(it.due)}</span><span>${statusText}</span></div>

@@ -11,6 +11,7 @@
       pickBuckets, hasRequired, allDoneToday, onAllDone,
       relativeDueLabel, fmt, unitLabel, capUnit,
     } = ctx;
+    const escapeHtml = window.TPHtml.escapeHtml;
 function requiredRowHtml(t, subheadClass){
   const dotClass = t.overdue ? 'tp-today-dot-tight' : (t.dueToday ? 'tp-today-dot-due-today' : '');
   const idx = itemIndexMap.get(t.it);
@@ -20,7 +21,7 @@ function requiredRowHtml(t, subheadClass){
   // badge like "1 reading" adds nothing, so only multi-part items get one.
   const amtBadge = `<span class="tp-today-amt">${t.it.total>1 ? fmt(t.amt)+' '+unitLabel(t.amt,t.unit) : capUnit(t.unit)}</span>`;
   return `<div class="tp-today-row tp-today-clickable"${idxAttr}>
-    <span class="tp-today-title"><span class="tp-today-dot ${dotClass}"></span><span class="tp-today-title-col"><span class="tp-today-title-main">${t.title}</span>${dueHint}</span></span>
+    <span class="tp-today-title"><span class="tp-today-dot ${dotClass}"></span><span class="tp-today-title-col"><span class="tp-today-title-main">${escapeHtml(t.title)}</span>${dueHint}</span></span>
     ${amtBadge}
   </div>`;
 }
@@ -38,7 +39,7 @@ function optionalBucketHtml(bucket){
     const idxAttr = idx!==undefined ? ` data-item-i="${idx}"` : '';
     const amtBadge = `<span class="tp-today-amt">${e.kind==='multi' ? fmt(e.amt)+' '+unitLabel(e.amt,e.unit) : capUnit(e.unit)}</span>`;
     return `<div class="tp-today-row ${rowClass}"${idxAttr}>
-      <span class="tp-today-title"><span class="tp-today-dot ${dotClass}"></span><span class="tp-today-title-main">${e.title}</span></span>
+      <span class="tp-today-title"><span class="tp-today-dot ${dotClass}"></span><span class="tp-today-title-main">${escapeHtml(e.title)}</span></span>
       ${amtBadge}
     </div>`;
   }).join('');
@@ -55,7 +56,7 @@ function compactPickBucketHtml(bucket){
     const idx = itemIndexMap.get(e.it);
     const idxAttr = idx!==undefined ? ` data-item-i="${idx}"` : '';
     return `<div class="tp-today-row tp-today-clickable"${idxAttr}>
-      <span class="tp-today-title"><span class="tp-today-dot"></span><span class="tp-today-title-main">${e.title}</span></span>
+      <span class="tp-today-title"><span class="tp-today-dot"></span><span class="tp-today-title-main">${escapeHtml(e.title)}</span></span>
       <span class="tp-today-amt">${capUnit(e.unit)}</span>
     </div>`;
   }).join('');
@@ -67,7 +68,7 @@ function compactOptionalBucketHtml(bucket){
     const idx = itemIndexMap.get(e.it);
     const idxAttr = idx!==undefined ? ` data-item-i="${idx}"` : '';
     return `<div class="tp-today-row tp-today-clickable tp-today-optional"${idxAttr}>
-      <span class="tp-today-title"><span class="tp-today-dot tp-today-dot-optional"></span><span class="tp-today-title-main">${e.title}</span></span>
+      <span class="tp-today-title"><span class="tp-today-dot tp-today-dot-optional"></span><span class="tp-today-title-main">${escapeHtml(e.title)}</span></span>
       <span class="tp-today-amt">${capUnit(e.unit)}</span>
     </div>`;
   }).join('');

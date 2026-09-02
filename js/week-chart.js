@@ -11,6 +11,7 @@
    */
   function weekChartHtml(opts) {
     const { items, summaryText, animate, today, addDays, courseColor } = opts;
+    const escapeHtml = window.TPHtml.escapeHtml;
     const days = [];
     for (let i = 0; i < 7; i++) {
       const d = addDays(today(), i);
@@ -37,7 +38,7 @@
             courseEntries
               .map(([course, count]) => {
                 const segH = Math.max(4, Math.round((count / x.total) * totalH));
-                return `<div class="tp-week-seg" style="background:${courseColor(course)};height:${segH}px;" title="${course}: ${count}"></div>`;
+                return `<div class="tp-week-seg" style="background:${courseColor(course)};height:${segH}px;" title="${escapeHtml(course)}: ${count}"></div>`;
               })
               .join('') +
             `</div>`;

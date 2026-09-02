@@ -15,9 +15,10 @@
       document.body.appendChild(toast);
     }
     const hasUndo = typeof onUndo === 'function';
+    const safeMessage = window.TPHtml.escapeHtml(message);
     toast.innerHTML = hasUndo
-      ? `<span>${message}</span><button id="tp-toast-undo">Undo</button>`
-      : `<span>${message}</span>`;
+      ? `<span>${safeMessage}</span><button id="tp-toast-undo">Undo</button>`
+      : `<span>${safeMessage}</span>`;
     toast.style.display = 'flex';
     toast.classList.remove('tp-toast-anim');
     void toast.offsetWidth;

@@ -1,9 +1,10 @@
 /* views/chrome-html.js — Topbar, banners, controls, modal, FAB */
 (function (global) {
   function topbarHtml({ searchTerm, sortMode }) {
+    const escapeHtml = window.TPHtml.escapeHtml;
     return `<div class="tp-topbar">
       <div class="tp-search-wrap">
-        <input id="tp-filter" placeholder="Search title, course, notes..." value="${searchTerm}">
+        <input id="tp-filter" placeholder="Search title, course, notes..." value="${escapeHtml(searchTerm)}">
         ${searchTerm ? `<button id="tp-search-clear" type="button" class="tp-search-clear" aria-label="Clear search">&times;</button>` : ''}
       </div>
       <select id="tp-sort">
@@ -120,6 +121,7 @@
 
   function courseManagerHtml({ showCourseManager, items, courseColor }) {
     if (!showCourseManager) return '';
+    const escapeHtml = window.TPHtml.escapeHtml;
     const courseNames = [...new Set(items.map((i) => (i.course || '').trim()).filter(Boolean))];
     let html = `<div class="tp-course-manager" id="tp-course-manager">`;
     if (courseNames.length === 0) {
@@ -127,8 +129,8 @@
     } else {
       courseNames.forEach((c) => {
         html += `<div class="tp-course-row">
-        <input type="text" class="tp-course-rename" data-course="${c}" value="${c}">
-        <input type="color" class="tp-course-color" data-course="${c}" value="${courseColor(c)}">
+        <input type="text" class="tp-course-rename" data-course="${escapeHtml(c)}" value="${escapeHtml(c)}">
+        <input type="color" class="tp-course-color" data-course="${escapeHtml(c)}" value="${courseColor(c)}">
       </div>`;
       });
     }
