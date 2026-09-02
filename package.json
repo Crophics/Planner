@@ -4,5 +4,8 @@
   "scripts": {
     "deploy": "wrangler deploy",
     "test": "node --test"
+  },
+  "devDependencies": {
+    "eslint": "^10.9.1"
   }
 }
