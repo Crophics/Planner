@@ -264,20 +264,15 @@
   const capUnit = window.TP.capUnit;
 
   /* ---- Item helpers ---- */
-  function isLocked(it){
-    if(!it.dependsOn) return false;
-    const prereq = items.find(x=>x.title===it.dependsOn);
-    return prereq ? !prereq.completed : false;
+    function isLocked(it){
+    return window.TPItemLogic.isLocked(items, it);
   }
-
   // An item whose prerequisite was JUST completed today shouldn't immediately
   // join Today's Targets (required or optional) - that would make it look
   // like there's still more to do the same day you already made progress on
   // that chain. It surfaces normally starting tomorrow.
   function unlockedToday(it){
-    if(!it.dependsOn) return false;
-    const prereq = items.find(x=>x.title===it.dependsOn);
-    return !!(prereq && prereq.completed && prereq.completedAt===today());
+    return window.TPItemLogic.unlockedToday(items, it, today);
   }
 
   // Reorders items by dragging: src/target are indices into the `items` array.
