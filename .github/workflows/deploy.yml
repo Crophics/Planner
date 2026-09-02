@@ -3,6 +3,8 @@ name: Deploy
 on:
   push:
     branches: ["main"]
+    paths-ignore:
+      - '**/*.md'
   workflow_dispatch:
 
 jobs:
@@ -22,10 +24,8 @@ jobs:
               - '**'
               - '!functions/**'
               - '!.github/**'
-              - '!**/*.md'
             functions:
               - 'functions/**'
-              - '!functions/**/*.md'
 
   deploy-site:
     needs: changes
