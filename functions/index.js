@@ -32,10 +32,15 @@ function ymdInTimeZone(timeZone, date = new Date()) {
 
 function hourInTimeZone(timeZone, date = new Date()) {
   try {
+    // hourCycle: 'h23' (not hour12: false) is deliberate — with hour12:
+    // false alone, en-US's default hour cycle is h24 (1-24), so midnight
+    // formats as "24" instead of "0". That made localHour >= notifyHour
+    // true right after midnight, firing the digest hours early. h23 pins
+    // the range to 0-23 explicitly.
     const h = new Intl.DateTimeFormat('en-US', {
       timeZone: timeZone || 'UTC',
       hour: 'numeric',
-      hour12: false,
+      hourCycle: 'h23',
     }).format(date);
     return Number(h);
   } catch {
