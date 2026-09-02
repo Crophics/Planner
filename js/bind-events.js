@@ -336,10 +336,13 @@ root.querySelectorAll('.tp-log').forEach(b=>b.onclick=()=>{
     it.completedAt = api.today();
     if(it.recurring) api.items.push(api.makeRecurringClone(it));
   }
-  if(fullyCompleted || reachedDailyTarget){
+    if(fullyCompleted || reachedDailyTarget){
     const rect = b.getBoundingClientRect();
     const workAfter = api.hasTodayWorkRemaining();
     if(workBefore && !workAfter){
+      // Day just finished — log it before save/render so the streak 🔥
+      // text appears on this same paint (not the next interaction).
+      if(api.logDayComplete) api.logDayComplete();
       api.triggerCelebration(window.innerWidth/2, window.innerHeight*0.25, true);
     } else {
       api.triggerCelebration(rect.left + rect.width/2, rect.top + rect.height/2, false);
@@ -412,10 +415,13 @@ root.querySelectorAll('.tp-complete').forEach(b=>b.onclick=()=>{
     it.archived = false;
   }
   if(api.touchItem) api.touchItem(it); else it.updatedAt = Date.now();
-  if(completing){
+    if(completing){
     const rect = b.getBoundingClientRect();
     const workAfter = api.hasTodayWorkRemaining();
     if(workBefore && !workAfter){
+      // Day just finished — log it before save/render so the streak 🔥
+      // text appears on this same paint (not the next interaction).
+      if(api.logDayComplete) api.logDayComplete();
       api.triggerCelebration(window.innerWidth/2, window.innerHeight*0.25, true);
     } else {
       api.triggerCelebration(rect.left + rect.width/2, rect.top + rect.height/2, false);

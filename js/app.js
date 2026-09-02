@@ -463,10 +463,24 @@
     if(seen === todayKey || dismissed === todayKey) return null;
 
     const streak = currentStreak();
+    if(streak > 0){
+      return {
+        message: `Your ${streak}-day streak is still active. Keep the momentum going today.`
+      };
+    }
+
+    // Only announce "streak ended" when a real streak just broke: the day
+    // before yesterday is logged (streak was alive) but yesterday is not
+    // (missed that day). Empty installs, imports with no recent history, and
+    // streaks that died days ago must not show this banner.
+    const yesterday = addDays(todayKey, -1);
+    const dayBeforeYesterday = addDays(todayKey, -2);
+    const daySet = new Set(dayCompleteLog);
+    const justEnded = daySet.has(dayBeforeYesterday) && !daySet.has(yesterday);
+    if(!justEnded) return null;
+
     return {
-      message: streak > 0
-        ? `Your ${streak}-day streak is still active. Keep the momentum going today.`
-        : 'Your streak ended today. Reset your focus and build it back tomorrow.'
+      message: 'Your streak ended today. Reset your focus and build it back tomorrow.'
     };
   }
 
@@ -687,7 +701,7 @@
       items, list, render, save, savePrefs, exportData, exportIcs, importData,
       dependsOptionsHtml, clearCompleted, deleteItemAt, renameCourse, saveCourseColors,
       courseColors, reorderByDrag, makeRecurringClone, triggerCelebration, today,
-      hasTodayWorkRemaining, scrollToAndHighlight, checkAndNotify, applyTheme,
+      hasTodayWorkRemaining, logDayComplete, scrollToAndHighlight, checkAndNotify, applyTheme,
       isDevModeTrigger, activateDevMode, deactivateDevMode, saveDevPanelOpen, showToast,
       DAY_OFFSET_KEY,
       get showForm(){ return showForm; }, set showForm(v){ showForm = v; },
