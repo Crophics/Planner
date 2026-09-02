@@ -63,7 +63,7 @@ function compactPickBucketHtml(bucket){
   return `<div class="tp-today-group-header">${headerText}</div>` + rows;
 }
 function compactOptionalBucketHtml(bucket){
-  const headerText = `Later - due ${relativeDueLabel(bucket.due)}`;
+  const headerText = `Due ${relativeDueLabel(bucket.due)}`;
   const rows = bucket.entries.slice(0, 2).map(e=>{
     const idx = itemIndexMap.get(e.it);
     const idxAttr = idx!==undefined ? ` data-item-i="${idx}"` : '';
@@ -85,16 +85,14 @@ const requiredItemSet = new Set([
 if(allDoneToday && onAllDone) onAllDone();
 const requiredRowsHtml = requiredTight.map(t=>requiredRowHtml(t,false)).join('') + requiredPace.map(t=>requiredRowHtml(t,true)).join('');
 
+const noRequiredMessage = optionalBuckets.length
+  ? '<div class="tp-today-row"><span>You\'re all set for today - but here\'s what you can do to get ahead:</span></div>'
+  : '<div class="tp-today-row"><span>Nothing due today - you\'re caught up.</span></div>';
 const compactHasAnything = hasRequired || pickBuckets.length;
 const compactBody = compactHasAnything
   ? requiredRowsHtml + pickBuckets.map(b=>compactPickBucketHtml(b)).join('')
-  : '<div class="tp-today-row"><span>You\'re all set for today.</span></div>';
-
-const expandedBody = (hasRequired
-    ? requiredRowsHtml
-    : (optionalBuckets.length
-        ? '<div class="tp-today-row"><span>You\'re all set for today - but here\'s what you can do to get ahead:</span></div>'
-        : '<div class="tp-today-row"><span>Nothing due today - you\'re caught up.</span></div>')) +
+  : noRequiredMessage + (laterBuckets.length ? compactOptionalBucketHtml(laterBuckets[0]) : '');
+const expandedBody = (hasRequired ? requiredRowsHtml : noRequiredMessage) +
   optionalBuckets.map(b=>optionalBucketHtml(b)).join('');
 
 const panelHtml = `<div class="tp-today" id="tp-today-card">
