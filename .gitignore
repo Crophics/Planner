@@ -17,3 +17,6 @@ build/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Secrets
+.envrcfirebase-debug.log
