@@ -458,7 +458,13 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
     }
     remoteDigestDate = null;
     document.dispatchEvent(new CustomEvent("tp-auth-changed", { detail: { user } }));
-    if (!user) return;
+    if (!user) {
+      // No account signed in, so there's no remote digest to wait for —
+      // the caller's initial checkAndNotify() (see app.js) can proceed
+      // immediately with remoteDigestDate staying null.
+      document.dispatchEvent(new CustomEvent("tp-fcm-ready", {}));
+      return;
+    }
     refreshPushTokenIfEnabled();
 
     // fcm.notifyHour is a single per-account value (the scheduled function
@@ -469,13 +475,34 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
     // is really going to do. A live listener (rather than one-shot getDoc)
     // also means an FCM push landing while the app is open, or another
     // device stamping lastDigestDate, updates remoteDigestDate right away.
+    //
+    // fcmSnapshotReady tracks whether the FIRST callback from this listener
+    // has landed. Until it does, remoteDigestDate is a stale "null" left
+    // over from the reset above, not a real answer — so any caller (e.g.
+    // app.js's initial checkAndNotify() at page load) that reads it too
+    // early can't tell "no digest sent today" apart from "haven't heard
+    // from Firestore yet". That gap was the cause of the local due-soon
+    // notification and the FCM push both firing the same day: the FCM
+    // digest had already run server-side and stamped fcm.lastDigestDate,
+    // but the browser's onSnapshot callback (like any Firestore listener)
+    // resolves asynchronously, well after app.js's synchronous startup
+    // call to checkAndNotify() had already read remoteDigestDate as null
+    // and gone ahead and notified. Dispatching "tp-fcm-ready" the first
+    // time this callback fires — and having app.js wait for it before its
+    // first check — closes that gap.
+    let fcmSnapshotReady = false;
     unsubFcmSnapshot = onSnapshot(doc(db, "users", user.uid, "taskplus", "fcm"), (fcmSnap) => {
-      if (!fcmSnap.exists()) return;
-      const data = fcmSnap.data();
-      if (Number.isInteger(data.notifyHour)) {
-        document.dispatchEvent(new CustomEvent("tp-notify-hour-remote", { detail: { notifyHour: data.notifyHour } }));
+      if (fcmSnap.exists()) {
+        const data = fcmSnap.data();
+        if (Number.isInteger(data.notifyHour)) {
+          document.dispatchEvent(new CustomEvent("tp-notify-hour-remote", { detail: { notifyHour: data.notifyHour } }));
+        }
+        if (data.lastDigestDate) remoteDigestDate = data.lastDigestDate;
       }
-      if (data.lastDigestDate) remoteDigestDate = data.lastDigestDate;
+      if (!fcmSnapshotReady) {
+        fcmSnapshotReady = true;
+        document.dispatchEvent(new CustomEvent("tp-fcm-ready", {}));
+      }
     });
 
     const ref = doc(db, "users", user.uid, "taskplus", "data");

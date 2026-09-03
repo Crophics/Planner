@@ -367,7 +367,32 @@
     if(s.addedFromLocal) parts.push(s.addedFromLocal + ' kept local-only');
     if(parts.length) showToast('Synced: ' + parts.join(' · '));
   });
-  checkAndNotify();
+  // Don't run the very first check synchronously at page load: at that
+  // instant window.tpSync's remoteDigestDate is always still null — not
+  // just because Firebase auth and the fcm doc's onSnapshot listener are
+  // async, but because firebase-sync.js is loaded as a `type="module"`
+  // script (see index.html), which always defers until after the document
+  // has been parsed, while this file is a plain synchronous script that
+  // runs immediately as the parser reaches it. So window.tpSync doesn't
+  // even exist yet at this point, let alone have a real answer for
+  // getLastDigestDate(). Calling checkAndNotify() here regardless meant
+  // this device's local "due today/tomorrow" notification would fire even
+  // on a day the FCM digest had already been sent (e.g. while the app was
+  // closed), because there was no way yet to tell "nothing sent today"
+  // apart from "don't know yet". Waiting for tp-fcm-ready (dispatched by
+  // firebase-sync.js once that first answer — signed-out, or the fcm
+  // doc's initial snapshot — is in) closes that race so only one of the
+  // two notifications ever fires for a given day. The timeout is a
+  // fallback in case firebase-sync.js fails to load at all, so
+  // notifications still work eventually, just without the cross-check.
+  let didInitialNotifyCheck = false;
+  function runInitialNotifyCheck(){
+    if(didInitialNotifyCheck) return;
+    didInitialNotifyCheck = true;
+    checkAndNotify();
+  }
+  document.addEventListener('tp-fcm-ready', runInitialNotifyCheck, { once: true });
+  setTimeout(runInitialNotifyCheck, 5000);
   document.addEventListener('visibilitychange', ()=>{
     if(document.visibilityState==='visible') checkAndNotify();
   });
