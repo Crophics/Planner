@@ -62,38 +62,45 @@
     const dueSoon = items.filter(
       (it) => !it.completed && !it.archived && !isLocked(it) && (it.due === t || it.due === tmrw)
     );
+    const dueTodayItems = dueSoon.filter((it) => it.due === t);
+    const dueTmrwItems = dueSoon.filter((it) => it.due === tmrw);
 
-    let firedToday = false;
-    ['today', 'tomorrow'].forEach((when) => {
-      const dueDate = when === 'today' ? t : tmrw;
-      const bucketItems = dueSoon.filter((it) => it.due === dueDate);
-      // One log key per day-bucket so we send a single digest per day, not per item
-      const digestKey = t + '|digest|' + when;
-      const newItems = bucketItems.filter((it) => !logSet.has(t + '|' + (it.id || it.title)));
-      if (newItems.length === 0) return;
-      if (logSet.has(digestKey) && notifyDigest) return;
+    // One combined notification per day covering both buckets — e.g.
+    // "2 due today · 3 due tomorrow" — instead of firing separately for
+    // today and tomorrow. Matches the FCM digest's style
+    // (functions/index.js) so a day with items due in both buckets
+    // doesn't produce two back-to-back local notifications.
+    const digestKey = t + '|digest';
+    const newItems = dueSoon.filter((it) => !logSet.has(t + '|' + (it.id || it.title)));
 
+    if (newItems.length > 0 && !(logSet.has(digestKey) && notifyDigest)) {
+      const parts = [];
+      if (dueTodayItems.length) parts.push(`${dueTodayItems.length} due today`);
+      if (dueTmrwItems.length) parts.push(`${dueTmrwItems.length} due tomorrow`);
       // Title matches the FCM push digest style; body differs since the app is already open here.
-      const title = `${newItems.length} due ${when}`;
+      const title = parts.join(' · ');
       const body = "Let's make a plan.";
       notify(title, body);
-      firedToday = true;
+
       if (newItems.length > 1) {
         log.push(digestKey);
         logSet.add(digestKey);
       }
-
       newItems.forEach((it) => {
         const key = t + '|' + (it.id || it.title);
         log.push(key);
         logSet.add(key);
       });
-    });
+
+      const cutoff = addDays(t, -3);
+      saveNotifyLog(log.filter((k) => k.split('|')[0] >= cutoff));
+
+      if (typeof onNotified === 'function') onNotified(t);
+      return;
+    }
 
     const cutoff = addDays(t, -3);
     saveNotifyLog(log.filter((k) => k.split('|')[0] >= cutoff));
-
-    if (firedToday && typeof onNotified === 'function') onNotified(t);
   }
 
   global.TPNotify = {
